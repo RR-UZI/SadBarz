@@ -14,6 +14,9 @@ import { Button, Row, Txt } from './ui';
 
 type Props = { block: Block; onFinish: (durationSec: number) => void };
 
+// The lead-in counts down silently and beeps only on its last seconds (3, 2, 1).
+const LEAD_BEEPS = 3;
+
 export function BlockRunner(props: Props) {
   if (props.block.format === 'sets') return <SetsRunner {...props} />;
   if (props.block.format === 'circuit') return <CircuitRunner {...props} />;
@@ -153,7 +156,7 @@ function TimedRunner({ block, onFinish }: Props) {
     }
     const whole = Math.ceil(remaining);
     const key = `${idx}:${whole}`;
-    const inWindow = seg.kind === 'leadin' ? whole <= seg.duration : whole < seg.duration;
+    const inWindow = seg.kind === 'leadin' ? whole <= Math.min(LEAD_BEEPS, seg.duration) : whole < seg.duration;
     if (key !== lastTick.current && whole > 0 && inWindow) {
       lastTick.current = key;
       if (seg.kind === 'leadin') cues.tick();
@@ -250,7 +253,7 @@ function SetsRunner({ block, onFinish }: Props) {
         return;
       }
       const whole = Math.ceil(leadRemaining);
-      if (`l${whole}` !== lastTick.current && whole < settings.leadInSec) {
+      if (`l${whole}` !== lastTick.current && whole <= Math.min(LEAD_BEEPS, settings.leadInSec)) {
         lastTick.current = `l${whole}`;
         cues.tick();
       }
@@ -388,7 +391,7 @@ function CircuitRunner({ block, onFinish }: Props) {
   useEffect(() => {
     if (lead > 0) {
       const whole = Math.ceil(lead);
-      if (`l${whole}` !== lastTick.current && whole < settings.leadInSec) {
+      if (`l${whole}` !== lastTick.current && whole <= Math.min(LEAD_BEEPS, settings.leadInSec)) {
         lastTick.current = `l${whole}`;
         cues.tick();
       }

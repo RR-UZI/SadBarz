@@ -8,7 +8,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 
 - **Routines**: create, edit, duplicate, delete. A routine is a list of blocks.
 - **Block formats**: EMOM / every N seconds (E30", E50", EM2M...), Tabata (work / rest), sets with rest (pyramids, weighted work, pairs), circuit (stopwatch + rounds). Each exercise can have reps, seconds, meters, calories, added weight (+kg), "max" and a note (DS, unbroken...).
-- **Workout mode**: the timer runs inside the routine. 3-2-1 countdown, start sound, sound every round, last-seconds beeps, end sound. After each block: Done (reps and weight pre-filled, editable), Repeat, Skip, or Finish workout. Then a 1, 2, 3 or 5 min break (the routine's own rest highlighted), and the next block waits for Start.
+- **Workout mode**: the timer runs inside the routine. 10-second get-ready countdown (beeps on 3-2-1), start sound, sound every round, last-seconds beeps, end sound. After each block: Done (reps and weight pre-filled, editable), Repeat, Skip, or Finish workout. Then a 1, 2, 3 or 5 min break (the routine's own rest highlighted), and the next block waits for Start.
 - **Timers tab**: EMOM, Tabata / intervals, countdown and stopwatch without a routine.
 - **History**: last 2 weeks (Free plan).
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.

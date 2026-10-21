@@ -8,10 +8,12 @@ import { setVolume } from '../lib/sound';
 import type { Exercise, Routine, Settings, Workout } from '../types';
 
 const STORAGE_KEY = 'sadbarz:v1';
+// Bumped when a default changes and saved settings should follow it (2: 10 s lead-in).
+const DATA_VERSION = 2;
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'es',
-  leadInSec: 3,
+  leadInSec: 10,
   startSound: true,
   roundSound: true,
   lastBeepsSec: 3,
@@ -60,14 +62,17 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       try {
         const raw = await AsyncStorage.getItem(STORAGE_KEY);
         if (raw) {
-          const saved = JSON.parse(raw) as Partial<Data>;
+          const saved = JSON.parse(raw) as Partial<Data> & { version?: number };
+          const settings = { ...DEFAULT_SETTINGS, ...saved.settings };
+          // v2: the lead-in default went from 3 s to 10 s.
+          if ((saved.version ?? 1) < 2 && settings.leadInSec === 3) settings.leadInSec = 10;
           // Keep seed exercises up to date, add the user's own on top.
           const custom = (saved.exercises ?? []).filter((e) => e.custom);
           setData({
             exercises: [...SEED_EXERCISES, ...custom],
             routines: saved.routines ?? seedRoutines(),
             workouts: saved.workouts ?? [],
-            settings: { ...DEFAULT_SETTINGS, ...saved.settings },
+            settings,
           });
         }
       } catch {
@@ -81,7 +86,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setVolume(data.settings.volume);
     if (!loaded.current) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(data)).catch(() => {});
+    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, version: DATA_VERSION })).catch(() => {});
   }, [data]);
 
   const exerciseById = useCallback((id: string) => data.exercises.find((e) => e.id === id), [data.exercises]);
