@@ -36,6 +36,10 @@ Shareable web preview (relative paths, can be hosted from any folder):
 ./scripts/build-web-preview.sh   # output in dist-preview/
 ```
 
+## Deploy the web app (Vercel)
+
+`vercel.json` already has the settings. In Vercel: **Add New → Project → Import** `RR-UZI/SadBarz`, keep the defaults, **Deploy**. Every push to `main` then publishes a new version, and every pull request gets its own preview link.
+
 ## Code map
 
 | Path | What it is |
