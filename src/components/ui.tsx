@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { clampInt } from '../lib/util';
 import { colors, font, radius, space } from '../theme';
+import { LogoMark } from './Logo';
 
 export function Screen({
   title,
@@ -24,8 +25,11 @@ export function Screen({
   children,
   scroll = true,
   footer,
+  mark = false,
 }: {
   title?: string;
+  /** Small SB logo on the left of the header (main tab screens). */
+  mark?: boolean;
   onBack?: () => void;
   right?: React.ReactNode;
   children: React.ReactNode;
@@ -35,13 +39,15 @@ export function Screen({
   const insets = useSafeAreaInsets();
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
-      {(title || onBack || right) && (
+      {(title || onBack || right || mark) && (
         <View style={styles.header}>
           <View style={styles.headerSide}>
             {onBack ? (
               <Pressable onPress={onBack} hitSlop={12} accessibilityRole="button" accessibilityLabel="Back" style={styles.backBtn}>
                 <Text style={styles.backText}>‹</Text>
               </Pressable>
+            ) : mark ? (
+              <LogoMark size={26} />
             ) : null}
           </View>
           <Text style={styles.headerTitle} numberOfLines={1}>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 
+import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { totalReps } from '../lib/blocks';
@@ -57,7 +58,7 @@ export function HistoryScreen() {
   const visible = workouts.filter((w) => w.startedAt >= cutoff);
 
   return (
-    <Screen title={t('history.title')}>
+    <Screen title={t('history.title')} mark>
       <Card style={{ borderStyle: 'dashed', borderColor: colors.faint }}>
         <Txt variant="small">{t('history.free')}</Txt>
         <Row style={{ marginTop: 6 }}>
@@ -68,7 +69,14 @@ export function HistoryScreen() {
         </Row>
       </Card>
       <View style={{ gap: space.sm, marginTop: space.lg }}>
-        {visible.length === 0 ? <Txt color={colors.muted}>{t('history.empty')}</Txt> : null}
+        {visible.length === 0 ? (
+          <View style={{ alignItems: 'center', gap: space.md, paddingVertical: space.xl }}>
+            <LogoMark size={64} style={{ opacity: 0.35 }} />
+            <Txt color={colors.muted} style={{ textAlign: 'center' }}>
+              {t('history.empty')}
+            </Txt>
+          </View>
+        ) : null}
         {visible.map((w) => (
           <WorkoutCard key={w.id} workout={w} />
         ))}

@@ -16,7 +16,7 @@ export function RoutinesScreen() {
   const nav = useNav();
 
   return (
-    <Screen title={t('routines.title')} right={<Button label="+" size="sm" onPress={() => nav.push({ name: 'editRoutine' })} />}>
+    <Screen title={t('routines.title')} mark right={<Button label="+" size="sm" onPress={() => nav.push({ name: 'editRoutine' })} />}>
       <Button label={t('routines.new')} variant="secondary" onPress={() => nav.push({ name: 'editRoutine' })} />
       <View style={{ gap: space.md, marginTop: space.lg }}>
         {routines.length === 0 ? <Txt color={colors.muted}>{t('routines.empty')}</Txt> : null}

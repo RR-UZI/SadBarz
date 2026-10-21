@@ -28,6 +28,7 @@ export function HomeScreen() {
         </Pressable>
       }
       title=" "
+      mark
     >
       <View style={{ alignItems: 'center', marginTop: space.sm, marginBottom: space.lg }}>
         <Image source={require('../../assets/logo-wordmark.png')} style={{ width: 240, height: 91 }} resizeMode="contain" accessibilityLabel="SadBarz" />

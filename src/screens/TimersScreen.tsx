@@ -34,7 +34,7 @@ export function TimersScreen() {
   };
 
   return (
-    <Screen title={t('timers.title')}>
+    <Screen title={t('timers.title')} mark>
       <Txt color={colors.muted}>{t('timers.subtitle')}</Txt>
 
       <Card style={{ marginTop: space.lg, gap: space.md }}>

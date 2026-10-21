@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { BlockRunner } from '../components/BlockRunner';
+import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, NumberField, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { defaultEntries, totalReps } from '../lib/blocks';
@@ -291,6 +292,9 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
           </Row>
         }
       >
+        <View style={{ alignItems: 'center', marginBottom: space.md }}>
+          <LogoMark size={80} />
+        </View>
         <Txt variant="title" style={{ textAlign: 'center' }}>
           {routine.name}
         </Txt>

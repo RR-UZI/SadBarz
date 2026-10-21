@@ -4,6 +4,7 @@ import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ConfirmHost } from './src/components/ConfirmHost';
+import { LogoMark } from './src/components/Logo';
 import { useT } from './src/i18n';
 import { NavProvider, useNav, type Route, type TabName } from './src/navigation';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
@@ -37,7 +38,8 @@ function Root() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 24 }}>
+        <LogoMark size={96} />
         <ActivityIndicator color={colors.accent} />
       </View>
     );
