@@ -1,0 +1,39 @@
+{
+  "expo": {
+    "name": "SadBarz",
+    "slug": "sadbarz",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.sadbarz.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0B0B0D",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "com.sadbarz.app"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "name": "SadBarz",
+      "shortName": "SadBarz",
+      "backgroundColor": "#0B0B0D",
+      "themeColor": "#0B0B0D",
+      "bundler": "metro",
+      "output": "single"
+    },
+    "backgroundColor": "#0B0B0D",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0B0B0D"
+    }
+  }
+}
