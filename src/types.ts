@@ -142,7 +142,8 @@ export interface Profile {
   equipment: Equipment[];
   /** 0 = Monday … 6 = Sunday. The count is the days per week. */
   trainingDays: number[];
-  sessionMin: 30 | 45 | 60 | 90;
+  /** 0 = no time limit. */
+  sessionMin: 0 | 30 | 45 | 60 | 90;
   /** First day of the plan, YYYY-MM-DD. */
   startDate: string;
   age: number;

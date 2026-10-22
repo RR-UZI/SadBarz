@@ -322,6 +322,8 @@ export const en: Record<StringKey, string> = {
   'dayLong.6': 'Sunday',
   'onb.session.title': 'How long is each session?',
   'onb.session.sub': 'Warm-up included.',
+  'onb.session.noCap': 'No time limit',
+  'onb.session.noCap.sub': 'The workout takes as long as it takes.',
   'onb.start.title': 'When do you start?',
   'onb.start.sub': 'Your training days are marked, and the next one is picked for you.',
   'onb.start.on': 'You start on {date}',

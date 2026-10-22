@@ -33,7 +33,7 @@ const TEST: (keyof MaxReps)[] = ['pullUps', 'dips', 'pushUps', 'muscleUps'];
 const SKILLS: Skill[] = ['handstand', 'lsit', 'frontLever', 'backLever', 'planche'];
 const EQUIPMENT: Equipment[] = ['bar', 'dips', 'parallettes', 'rings', 'bands', 'weights', 'tubes', 'none'];
 const INJURIES: Injury[] = ['shoulder', 'elbow', 'wrist', 'lowerBack', 'knee', 'other'];
-const SESSIONS: Profile['sessionMin'][] = [30, 45, 60, 90];
+const SESSIONS: Profile['sessionMin'][] = [30, 45, 60, 90, 0];
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 5); // 5:00 to 22:00
 
 interface Draft {
@@ -105,7 +105,7 @@ function stepDone(step: Step, d: Draft): boolean {
     case 'days':
       return d.trainingDays.length > 0;
     case 'session':
-      return !!d.sessionMin;
+      return d.sessionMin != null;
     case 'start':
       return !!d.startDate;
     case 'body': {
@@ -342,7 +342,13 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
           <Title text={t('onb.session.title')} sub={t('onb.session.sub')} />
           <View style={{ gap: space.sm }}>
             {SESSIONS.map((m) => (
-              <Option key={m} label={`${m} min`} active={d.sessionMin === m} onPress={() => set({ sessionMin: m })} />
+              <Option
+                key={m}
+                label={sessionLabel(m, t)}
+                sub={m ? undefined : t('onb.session.noCap.sub')}
+                active={d.sessionMin === m}
+                onPress={() => set({ sessionMin: m })}
+              />
             ))}
           </View>
         </>
@@ -507,7 +513,7 @@ function Review({ d, edit }: { d: Draft; edit: (s: Step) => void }) {
       label: 'onb.review.days',
       value: days.map((x) => t(`dayLong.${x}` as StringKey).slice(0, 3)).join(' · '),
     },
-    { step: 'session', label: 'onb.review.session', value: d.sessionMin ? `${d.sessionMin} min` : '–' },
+    { step: 'session', label: 'onb.review.session', value: d.sessionMin != null ? sessionLabel(d.sessionMin, t) : '–' },
     { step: 'start', label: 'onb.review.start', value: d.startDate ? longDate(d.startDate, settings.language) : '–' },
     {
       step: 'body',
@@ -634,6 +640,10 @@ function MonthArrow({ label, a11y, disabled, onPress }: { label: string; a11y: s
       </Txt>
     </Pressable>
   );
+}
+
+function sessionLabel(m: number, t: (k: StringKey) => string) {
+  return m ? `${m} min` : t('onb.session.noCap');
 }
 
 function longDate(iso: string, lang: string) {

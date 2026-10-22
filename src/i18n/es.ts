@@ -321,6 +321,8 @@ export const es = {
   'dayLong.6': 'Domingo',
   'onb.session.title': '¿Cuánto dura cada sesión?',
   'onb.session.sub': 'Con calentamiento incluido.',
+  'onb.session.noCap': 'Sin límite de tiempo',
+  'onb.session.noCap.sub': 'El entreno dura lo que tenga que durar.',
   'onb.start.title': '¿Cuándo empiezas?',
   'onb.start.sub': 'Marcamos tus días de entreno y elegimos el próximo.',
   'onb.start.on': 'Empiezas el {date}',
