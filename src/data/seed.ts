@@ -75,6 +75,15 @@ function circuit(title: string, rounds: number, items: BlockItem[], restAfterSec
   return { id: id('bl'), title, format: 'circuit', items, rows: [], intervalSec: 60, rounds, perRound: 'all', workSec: 20, restSec: 10, restAfterSec };
 }
 
+/** The example week, Monday to Friday. Home lists these first, in this order. */
+export const WEEK_ROUTINE_IDS = [
+  'rt_seed_lunes_emom50',
+  'rt_seed_martes_em2m',
+  'rt_seed_miercoles_pierna',
+  'rt_seed_jueves_reps',
+  'rt_seed_viernes_full',
+];
+
 // One routine per weekday, Monday to Friday, in the order Uzi trains them.
 export function seedRoutines(): Routine[] {
   n = 0;
