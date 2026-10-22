@@ -65,7 +65,7 @@ export function HomeScreen() {
 
       <Section title={t('home.quickStart')}>
         <View style={{ gap: space.sm }}>
-          {routines.slice(0, 4).map((r) => (
+          {routines.slice(0, 5).map((r) => (
             <Card key={r.id} onPress={() => nav.push({ name: 'routine', id: r.id })} style={{ paddingVertical: space.md }}>
               <Row style={{ justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
