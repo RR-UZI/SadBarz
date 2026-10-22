@@ -39,13 +39,9 @@ Shareable web preview (relative paths, can be hosted from any folder):
 
 ## Accounts (Supabase)
 
-Sign up and log in use [Supabase Auth](https://supabase.com/docs/guides/auth). Without keys the app runs in **preview mode**: the account is kept on the device only and no emails are sent.
+Sign up and log in use [Supabase Auth](https://supabase.com/docs/guides/auth), project `tdfslnfurzqryyecxfik`. Its address and publishable key are in `src/lib/supabase.ts`; both are public by design. `.env.example` shows how to point at another project or switch to **preview mode** (account kept on the device, no emails), which the shareable preview build uses.
 
-To turn on real accounts:
-
-1. Create a free project at supabase.com.
-2. In **Authentication → URL Configuration**, set the Site URL to the Vercel address and add it to Redirect URLs (and `http://localhost:8081` for local work).
-3. Copy **Project URL** and the **anon public key** from **Project Settings → API** into `.env` (see `.env.example`) and into Vercel's **Settings → Environment Variables**, then redeploy.
+In Supabase, **Authentication → URL Configuration** must list the site address (the Vercel URL, and `http://localhost:8081` for local work) so confirmation and password reset links come back to the app.
 
 ## Deploy the web app (Vercel)
 
