@@ -5,7 +5,7 @@ import { Image, Pressable, View } from 'react-native';
 import { Button, Card, Field, Row, Screen, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
 import { MIN_PASSWORD, useAuth, type AuthError } from '../store/Auth';
-import { colors, space } from '../theme';
+import { colors, radius, space } from '../theme';
 
 type Mode = 'welcome' | 'login' | 'signup' | 'forgot' | 'forgotSent' | 'checkEmail' | 'newPassword';
 
@@ -13,7 +13,10 @@ export function AuthScreen() {
   const auth = useAuth();
   const [mode, setMode] = useState<Mode>(auth.recovering ? 'newPassword' : 'welcome');
   const [email, setEmail] = useState('');
-  const go = (m: Mode) => setMode(m);
+  const go = (m: Mode) => {
+    auth.clearLinkError();
+    setMode(m);
+  };
 
   if (auth.recovering || mode === 'newPassword') return <NewPassword />;
   if (mode === 'login') return <Login email={email} setEmail={setEmail} go={go} />;
@@ -29,10 +32,12 @@ type EmailProps = { email: string; setEmail: (e: string) => void; go: Go };
 
 function Welcome({ go }: { go: Go }) {
   const t = useT();
+  const { linkError } = useAuth();
   return (
     <Screen
       footer={
         <View style={{ gap: space.sm }}>
+          <GoogleButton />
           <Button label={t('auth.createAccount')} size="lg" onPress={() => go('signup')} />
           <Button label={t('auth.haveAccount')} variant="secondary" size="lg" onPress={() => go('login')} />
         </View>
@@ -44,6 +49,7 @@ function Welcome({ go }: { go: Go }) {
         <Txt color={colors.muted} style={{ textAlign: 'center', fontSize: 17, lineHeight: 24, maxWidth: 320 }}>
           {t('auth.tagline')}
         </Txt>
+        <ErrorText error={linkError} />
       </View>
       <PreviewNote />
     </Screen>
@@ -74,6 +80,7 @@ function Login({ email, setEmail, go }: EmailProps) {
     <Screen title=" " onBack={() => go('welcome')}>
       <Header title={t('auth.loginTitle')} />
       <View style={{ gap: space.md }}>
+        <GoogleButton withDivider />
         <EmailField value={email} onChange={edit(setEmail)} />
         <PasswordField value={password} onChange={edit(setPassword)} label={t('auth.password')} onSubmit={submit} autoComplete="current-password" />
         <Pressable onPress={() => go('forgot')} hitSlop={8} style={{ alignSelf: 'flex-end' }} accessibilityRole="link">
@@ -116,6 +123,7 @@ function SignUp({ email, setEmail, go }: EmailProps) {
     <Screen title=" " onBack={() => go('welcome')}>
       <Header title={t('auth.signupTitle')} sub={t('auth.signupSub')} />
       <View style={{ gap: space.md }}>
+        <GoogleButton withDivider />
         <Field
           label={t('auth.name')}
           value={name}
@@ -346,6 +354,59 @@ function SwitchLink({ textKey, linkKey, onPress }: { textKey: StringKey; linkKey
         </Txt>
       </Pressable>
     </Row>
+  );
+}
+
+function GoogleButton({ withDivider }: { withDivider?: boolean }) {
+  const t = useT();
+  const { canUseGoogle, signInWithGoogle } = useAuth();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<AuthError | null>(null);
+  if (!canUseGoogle) return null;
+
+  const press = async () => {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    const res = await signInWithGoogle();
+    // On success the page leaves for Google, so only failures get here.
+    if (!res.ok) {
+      setBusy(false);
+      setError(res.error);
+    }
+  };
+
+  return (
+    <View style={{ gap: space.md }}>
+      <Pressable
+        onPress={press}
+        disabled={busy}
+        accessibilityRole="button"
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 12,
+          backgroundColor: '#FFFFFF',
+          borderRadius: radius.md,
+          paddingVertical: 18,
+          opacity: busy ? 0.6 : pressed ? 0.85 : 1,
+        })}
+      >
+        <Image source={require('../../assets/google-g.png')} style={{ width: 20, height: 20 }} />
+        <Txt style={{ color: '#1F1F1F', fontWeight: '700', fontSize: 18 }}>{busy ? '…' : t('auth.google')}</Txt>
+      </Pressable>
+      <ErrorText error={error} />
+      {withDivider ? (
+        <Row style={{ alignItems: 'center' }} gap={space.md}>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+          <Txt variant="small" color={colors.faint}>
+            {t('auth.or')}
+          </Txt>
+          <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+        </Row>
+      ) : null}
+    </View>
   );
 }
 
