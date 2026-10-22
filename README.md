@@ -12,7 +12,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **Timers tab**: EMOM, Tabata / intervals, countdown and stopwatch without a routine.
 - **History**: last 2 weeks (Free plan).
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.
-- **Example routines** from Uzi's own training.
+- **Example routines** from Uzi's own training, one per weekday: Monday weighted push and pull, Tuesday tubes, reps and cardio, Wednesday legs and abs, Thursday reps to failure, Friday full body.
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.

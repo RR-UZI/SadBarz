@@ -9,7 +9,7 @@ import type { Exercise, Routine, Settings, Workout } from '../types';
 
 const STORAGE_KEY = 'sadbarz:v1';
 // Bumped when a default changes and saved settings should follow it (2: 10 s lead-in).
-const DATA_VERSION = 2;
+const DATA_VERSION = 3;
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'es',
@@ -52,6 +52,13 @@ function initialData(): Data {
   return { exercises: SEED_EXERCISES, routines: seedRoutines(), workouts: [], settings: DEFAULT_SETTINGS };
 }
 
+// Swaps the old examples for the current ones. Examples the user edited are kept.
+function withNewExamples(routines: Routine[]) {
+  const kept = routines.filter((r) => !r.example || r.updatedAt !== r.createdAt);
+  const seeds = seedRoutines().filter((s) => !kept.some((r) => r.id === s.id));
+  return [...kept.filter((r) => !r.example), ...seeds, ...kept.filter((r) => r.example)];
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [data, setData] = useState<Data>(initialData);
   const [ready, setReady] = useState(false);
@@ -70,7 +77,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const custom = (saved.exercises ?? []).filter((e) => e.custom);
           setData({
             exercises: [...SEED_EXERCISES, ...custom],
-            routines: saved.routines ?? seedRoutines(),
+            // v3: the examples became one routine per weekday, Monday to Friday.
+            routines: saved.routines ? ((saved.version ?? 1) < 3 ? withNewExamples(saved.routines) : saved.routines) : seedRoutines(),
             workouts: saved.workouts ?? [],
             settings,
           });
@@ -122,7 +130,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const reloadExamples = useCallback(() => {
     setData((d) => {
       const seeds = seedRoutines();
-      const others = d.routines.filter((r) => !seeds.some((s) => s.id === r.id));
+      // Untouched old examples go too; ones the user edited stay unless a current example replaces them.
+      const others = d.routines.filter((r) => !seeds.some((s) => s.id === r.id) && !(r.example && r.updatedAt === r.createdAt));
       return { ...d, routines: [...others, ...seeds] };
     });
   }, []);
