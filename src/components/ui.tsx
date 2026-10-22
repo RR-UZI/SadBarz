@@ -9,6 +9,7 @@ import {
   TextInput,
   View,
   type StyleProp,
+  type TextInputProps,
   type TextStyle,
   type ViewStyle,
 } from 'react-native';
@@ -285,24 +286,34 @@ export function Field({
   onChangeText,
   placeholder,
   multiline,
+  inputProps,
+  right,
 }: {
   label?: string;
   value: string;
   onChangeText: (t: string) => void;
   placeholder?: string;
   multiline?: boolean;
+  /** Extra TextInput settings: keyboard type, password entry, autofill... */
+  inputProps?: TextInputProps;
+  /** Something drawn inside the field on the right, like a show/hide button. */
+  right?: React.ReactNode;
 }) {
   return (
     <View style={{ gap: 6 }}>
       {label ? <Txt variant="small" color={colors.muted}>{label}</Txt> : null}
-      <TextInput
-        value={value}
-        onChangeText={onChangeText}
-        placeholder={placeholder}
-        placeholderTextColor={colors.faint}
-        multiline={multiline}
-        style={[styles.input, multiline && { minHeight: 70, textAlignVertical: 'top' }]}
-      />
+      <View style={{ justifyContent: 'center' }}>
+        <TextInput
+          value={value}
+          onChangeText={onChangeText}
+          placeholder={placeholder}
+          placeholderTextColor={colors.faint}
+          multiline={multiline}
+          {...inputProps}
+          style={[styles.input, multiline && { minHeight: 70, textAlignVertical: 'top' }, right ? { paddingRight: 64 } : null]}
+        />
+        {right ? <View style={{ position: 'absolute', right: 8 }}>{right}</View> : null}
+      </View>
     </View>
   );
 }

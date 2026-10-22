@@ -7,6 +7,7 @@ import { ConfirmHost } from './src/components/ConfirmHost';
 import { LogoMark } from './src/components/Logo';
 import { useT } from './src/i18n';
 import { NavProvider, useNav, type Route, type TabName } from './src/navigation';
+import { AuthScreen } from './src/screens/AuthScreen';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
@@ -16,17 +17,20 @@ import { SettingsScreen } from './src/screens/SettingsScreen';
 import { QuickTimerScreen, StopwatchScreen, TimersScreen } from './src/screens/TimersScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { AppProvider, useApp } from './src/store/AppStore';
+import { AuthProvider, useAuth } from './src/store/Auth';
 import { colors } from './src/theme';
 
 export default function App() {
   return (
     <SafeAreaProvider>
       <AppProvider>
-        <NavProvider>
-          <StatusBar style="light" />
-          <Root />
-          <ConfirmHost />
-        </NavProvider>
+        <AuthProvider>
+          <NavProvider>
+            <StatusBar style="light" />
+            <Root />
+            <ConfirmHost />
+          </NavProvider>
+        </AuthProvider>
       </AppProvider>
     </SafeAreaProvider>
   );
@@ -34,9 +38,10 @@ export default function App() {
 
 function Root() {
   const { ready } = useApp();
+  const auth = useAuth();
   const { stack, tab } = useNav();
 
-  if (!ready) {
+  if (!ready || !auth.ready) {
     return (
       <View style={{ flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', gap: 24 }}>
         <LogoMark size={96} />
@@ -44,6 +49,8 @@ function Root() {
       </View>
     );
   }
+
+  if (!auth.user || auth.recovering) return <AuthScreen />;
 
   const top = stack[stack.length - 1];
   if (top) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{renderRoute(top)}</View>;

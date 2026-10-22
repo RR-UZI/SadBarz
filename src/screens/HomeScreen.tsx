@@ -7,12 +7,14 @@ import { formatLabel } from '../lib/blocks';
 import { startOfWeek } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
+import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
 import { WorkoutCard } from './HistoryScreen';
 
 export function HomeScreen() {
   const t = useT();
   const { routines, workouts } = useApp();
+  const { user } = useAuth();
   const nav = useNav();
 
   const weekStart = startOfWeek(Date.now());
@@ -33,7 +35,7 @@ export function HomeScreen() {
       <View style={{ alignItems: 'center', marginTop: space.sm, marginBottom: space.lg }}>
         <Image source={require('../../assets/logo-wordmark.png')} style={{ width: 240, height: 91 }} resizeMode="contain" accessibilityLabel="SadBarz" />
         <Txt variant="h2" style={{ marginTop: space.md }}>
-          {t('home.hello')}
+          {user ? t('home.helloName', { name: user.name.split(' ')[0] }) : t('home.hello')}
         </Txt>
       </View>
 

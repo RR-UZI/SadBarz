@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Builds the web version into dist-preview/ with relative paths,
 # so it can be hosted from any folder (e.g. as a shareable preview link).
+# Accounts run in preview mode here: sandboxed preview hosts can't reach Supabase.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 rm -rf dist dist-preview
-npx expo export -p web
+EXPO_PUBLIC_ACCOUNTS=preview npx expo export -p web
 mkdir -p dist-preview
 cp -r dist/assets dist-preview/
 SRC=$(ls dist/_expo/static/js/web/*.js)
