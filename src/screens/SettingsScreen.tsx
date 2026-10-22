@@ -1,11 +1,13 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
-import { Button, Divider, Row, Screen, Section, Segmented, ToggleRow, Txt } from '../components/ui';
+import { Button, Card, Divider, Row, Screen, Section, Segmented, ToggleRow, Txt } from '../components/ui';
 import { useT } from '../i18n';
+import { confirm } from '../lib/confirm';
 import { sounds, unlockAudio } from '../lib/sound';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
+import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
 import type { Settings } from '../types';
 
@@ -13,11 +15,42 @@ export function SettingsScreen() {
   const t = useT();
   const nav = useNav();
   const { settings, updateSettings, reloadExamples } = useApp();
+  const { user, mode, signOut } = useAuth();
   const [reloaded, setReloaded] = useState(false);
   const set = (patch: Partial<Settings>) => updateSettings(patch);
 
   return (
     <Screen title={t('settings.title')} onBack={nav.pop}>
+      <Section title={t('settings.account')}>
+        <Card>
+          <Txt style={{ fontWeight: '800', fontSize: 17 }}>{user?.name}</Txt>
+          <Txt variant="small" color={colors.muted}>
+            {user?.email}
+          </Txt>
+          {mode === 'preview' ? (
+            <Txt variant="tiny" color={colors.warn} style={{ marginTop: 6 }}>
+              {t('auth.preview')}
+            </Txt>
+          ) : null}
+        </Card>
+        <Button
+          label={t('settings.signOut')}
+          variant="ghost"
+          style={{ marginTop: space.sm }}
+          onPress={() =>
+            confirm(
+              t('settings.signOutConfirm'),
+              () => {
+                nav.reset('home');
+                void signOut();
+              },
+              t('settings.signOut'),
+              t('common.cancel'),
+            )
+          }
+        />
+      </Section>
+
       <Section title={t('settings.language')}>
         <Segmented
           value={settings.language}

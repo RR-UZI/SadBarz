@@ -13,6 +13,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **History**: last 2 weeks (Free plan).
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.
 - **Example routines** from Uzi's own training.
+- **Accounts**: welcome, sign up, log in, forgot password, log out (Settings).
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
 
@@ -35,6 +36,16 @@ Shareable web preview (relative paths, can be hosted from any folder):
 ```bash
 ./scripts/build-web-preview.sh   # output in dist-preview/
 ```
+
+## Accounts (Supabase)
+
+Sign up and log in use [Supabase Auth](https://supabase.com/docs/guides/auth). Without keys the app runs in **preview mode**: the account is kept on the device only and no emails are sent.
+
+To turn on real accounts:
+
+1. Create a free project at supabase.com.
+2. In **Authentication → URL Configuration**, set the Site URL to the Vercel address and add it to Redirect URLs (and `http://localhost:8081` for local work).
+3. Copy **Project URL** and the **anon public key** from **Project Settings → API** into `.env` (see `.env.example`) and into Vercel's **Settings → Environment Variables**, then redeploy.
 
 ## Deploy the web app (Vercel)
 
