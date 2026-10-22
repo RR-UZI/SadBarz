@@ -75,6 +75,7 @@ function circuit(title: string, rounds: number, items: BlockItem[], restAfterSec
   return { id: id('bl'), title, format: 'circuit', items, rows: [], intervalSec: 60, rounds, perRound: 'all', workSec: 20, restSec: 10, restAfterSec };
 }
 
+// One routine per weekday, Monday to Friday, in the order Uzi trains them.
 export function seedRoutines(): Routine[] {
   n = 0;
   const now = Date.now();
@@ -83,8 +84,8 @@ export function seedRoutines(): Routine[] {
     {
       ...base,
       id: 'rt_seed_lunes_emom50',
-      name: 'Lunes · Lastre EMOM 50"',
-      note: 'Cada bloque alterna: ronda con lastre, ronda sin lastre.',
+      name: 'Lunes · Lastre push y pull',
+      note: 'Cada bloque alterna: ronda con lastre, ronda sin lastre. 2 min de descanso entre bloques.',
       blocks: [
         emom('Fondos', 50, 10, 'rotate', [it('ex_fondos', { reps: 12, weightKg: 30 }), it('ex_fondos', { reps: 30 })], 120),
         emom('Muscle ups', 50, 10, 'rotate', [it('ex_muscle', { reps: 5, weightKg: 10 }), it('ex_muscle', { reps: 8 })], 120),
@@ -106,29 +107,18 @@ export function seedRoutines(): Routine[] {
     },
     {
       ...base,
-      id: 'rt_seed_lunes_piramide',
-      name: 'Lunes · Lastre (pirámide)',
-      note: 'Sube el peso, bajan las reps.',
+      id: 'rt_seed_miercoles_pierna',
+      name: 'Miércoles · Pierna y abdomen',
+      note: 'Pierna con lastre y explosivos, cierra con abdomen. Es el día de recuperar el tren superior.',
       blocks: [
-        sets('Fondos con lastre', [
-          row(3, [it('ex_fondos', { reps: 10, weightKg: 30 })], 120),
-          row(3, [it('ex_fondos', { reps: 8, weightKg: 40 })], 120),
-          row(2, [it('ex_fondos', { reps: 6, weightKg: 50 })], 150),
-          row(2, [it('ex_fondos', { reps: 4, weightKg: 60 })], 180),
-        ], 180),
-        sets('Muscle ups con lastre', [
-          row(3, [it('ex_muscle', { reps: 5, weightKg: 10 })], 120),
-          row(3, [it('ex_muscle', { reps: 4, weightKg: 15 })], 120),
-          row(2, [it('ex_muscle', { reps: 3, weightKg: 20 })], 150),
-          row(2, [it('ex_muscle', { reps: 1, weightKg: 25 })], 180),
-        ], 180),
-        sets('Pull ups con lastre', [
-          row(3, [it('ex_pull', { reps: 10, weightKg: 20 })], 120),
-          row(3, [it('ex_pull', { reps: 8, weightKg: 25 })], 120),
-          row(2, [it('ex_pull', { reps: 6, weightKg: 30 })], 150),
-          row(2, [it('ex_pull', { reps: 4, weightKg: 40 })], 180),
-        ], 180),
-        sets('Push ups', [row(1, [it('ex_push', { reps: 120, weightKg: 10 })], 0)]),
+        tabata('Calentamiento', 20, 5, 12, 'rotate', [it('ex_sentadilla', { reps: 20 }), it('ex_desplantes', { reps: 10 }), it('ex_sentadilla_iso', { seconds: 20 })], 120),
+        emom('Sentadillas', 60, 12, 'rotate', [it('ex_sentadilla', { reps: 6, weightKg: 60 }), it('ex_sentadilla_expl', { reps: 20 })], 120),
+        emom('Desplantes', 60, 12, 'rotate', [it('ex_desplantes', { reps: 8, weightKg: 15 }), it('ex_desplantes_expl', { reps: 20 })], 120),
+        emom('Búlgaras + step ups', 60, 12, 'rotate', [it('ex_bulgaras', { reps: 8, weightKg: 10 }), it('ex_stepup', { reps: 20 })], 120),
+        emom('Box jumps + isometría', 60, 12, 'rotate', [it('ex_boxjump', { reps: 20 }), it('ex_sentadilla_iso', { seconds: 30, weightKg: 10 })], 120),
+        emom('Abdomen · toes to bar', 60, 10, 'all', [it('ex_t2b', { reps: 8 })], 60),
+        emom('Abdomen · leg raises', 60, 8, 'all', [it('ex_legraise', { reps: 12 })], 60),
+        emom('Abdomen · toes to bar cruzados', 60, 6, 'all', [it('ex_t2b', { reps: 10, note: 'cruzados' })]),
       ],
     },
     {
@@ -165,30 +155,29 @@ export function seedRoutines(): Routine[] {
     },
     {
       ...base,
-      id: 'rt_seed_miercoles_pierna',
-      name: 'Miércoles · Pierna',
+      id: 'rt_seed_viernes_full',
+      name: 'Viernes · Full body',
+      note: 'EMOM de 12 min por bloque: minuto 1 tren superior, minuto 2 pierna o cardio. Cada vuelta son 2 minutos.',
       blocks: [
-        tabata('Calentamiento', 20, 5, 12, 'rotate', [it('ex_sentadilla', { reps: 20 }), it('ex_desplantes', { reps: 10 }), it('ex_sentadilla_iso', { seconds: 20 })], 120),
-        emom('Sentadillas', 60, 12, 'rotate', [it('ex_sentadilla', { reps: 6, weightKg: 60 }), it('ex_sentadilla_expl', { reps: 20 })], 120),
-        emom('Desplantes', 60, 12, 'rotate', [it('ex_desplantes', { reps: 8, weightKg: 15 }), it('ex_desplantes_expl', { reps: 20 })], 120),
-        emom('Búlgaras + step ups', 60, 12, 'rotate', [it('ex_bulgaras', { reps: 8, weightKg: 10 }), it('ex_stepup', { reps: 20 })], 120),
-        emom('Box jumps + isometría', 60, 12, 'rotate', [it('ex_boxjump', { reps: 20 }), it('ex_sentadilla_iso', { seconds: 30, weightKg: 10 })]),
-      ],
-    },
-    {
-      ...base,
-      id: 'rt_seed_sabado_full',
-      name: 'Sábado · Full body',
-      blocks: [
-        emom('Muscle + push', 60, 10, 'all', [it('ex_muscle', { reps: 3 }), it('ex_bardips', { reps: 10 }), it('ex_pull', { reps: 4, note: 'unbroken' })], 120),
-        circuit('Circuito', 3, [
-          it('ex_front', { seconds: 10 }),
-          it('ex_burpees', { reps: 10 }),
-          it('ex_tubo_inclinado', { reps: 1 }),
-          it('ex_burpees', { reps: 15 }),
-          it('ex_cuerda', { reps: 1 }),
-          it('ex_pull', { reps: 10 }),
-        ]),
+        emom('Tubo + fondos · sentadillas', 120, 6, 'all', [
+          it('ex_tubo', { reps: 1 }),
+          it('ex_fondos', { reps: 20 }),
+          it('ex_sentadilla', { reps: 10, weightKg: 20 }),
+          it('ex_sentadilla_expl', { reps: 10 }),
+        ], 120),
+        emom('Tubo + muscle · desplantes', 120, 6, 'all', [
+          it('ex_tubo', { reps: 1 }),
+          it('ex_muscle', { reps: 5 }),
+          it('ex_desplantes', { reps: 8, weightKg: 10 }),
+          it('ex_desplantes_expl', { reps: 12 }),
+        ], 120),
+        emom('Pull + muscle · burpees', 120, 6, 'all', [
+          it('ex_pull', { reps: 8 }),
+          it('ex_muscle', { reps: 2 }),
+          it('ex_burpees', { reps: 5 }),
+          it('ex_sentadilla_expl', { reps: 10 }),
+        ], 120),
+        emom('Tubo + push · box jumps', 120, 6, 'all', [it('ex_tubo', { reps: 1 }), it('ex_push', { reps: 25 }), it('ex_boxjump', { reps: 15 })]),
       ],
     },
   ];
