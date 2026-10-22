@@ -85,10 +85,13 @@ export function HomeScreen() {
 
       <Section title={t('home.coachTitle')} right={<Badge label="PRO" color={colors.accent} textColor={colors.accentText} />}>
         <Card style={{ borderColor: colors.faint, borderStyle: 'dashed' }}>
-          <Txt>{t('home.coachBody')}</Txt>
+          <Txt>{user?.profile ? t('home.coachReady') : t('home.coachBody')}</Txt>
           <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm }}>
             {t('home.soon')}
           </Txt>
+          {user?.profile ? (
+            <Button label={t('home.viewProfile')} variant="ghost" size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
+          ) : null}
         </Card>
       </Section>
 

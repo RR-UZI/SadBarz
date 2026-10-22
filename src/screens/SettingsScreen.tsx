@@ -51,6 +51,10 @@ export function SettingsScreen() {
         />
       </Section>
 
+      <Section title={t('settings.profile')}>
+        <Button label={t('settings.editProfile')} variant="secondary" onPress={() => nav.push({ name: 'editProfile' })} />
+      </Section>
+
       <Section title={t('settings.language')}>
         <Segmented
           value={settings.language}

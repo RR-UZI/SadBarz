@@ -13,7 +13,8 @@ export type Route =
   | { name: 'quickTimer'; block: Block; title: string }
   | { name: 'stopwatch' }
   | { name: 'workoutDetail'; id: string }
-  | { name: 'settings' };
+  | { name: 'settings' }
+  | { name: 'editProfile' };
 
 interface Nav {
   tab: TabName;
