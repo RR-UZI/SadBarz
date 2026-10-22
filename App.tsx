@@ -10,6 +10,7 @@ import { NavProvider, useNav, type Route, type TabName } from './src/navigation'
 import { AuthScreen } from './src/screens/AuthScreen';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { EditProfileScreen, OnboardingScreen } from './src/screens/OnboardingScreen';
 import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
 import { RoutinesScreen } from './src/screens/RoutinesScreen';
@@ -51,6 +52,7 @@ function Root() {
   }
 
   if (!auth.user || auth.recovering) return <AuthScreen />;
+  if (!auth.user.profile) return <OnboardingScreen />;
 
   const top = stack[stack.length - 1];
   if (top) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{renderRoute(top)}</View>;
@@ -84,6 +86,8 @@ function renderRoute(r: Route) {
       return <WorkoutDetailScreen id={r.id} />;
     case 'settings':
       return <SettingsScreen />;
+    case 'editProfile':
+      return <EditProfileScreen />;
   }
 }
 

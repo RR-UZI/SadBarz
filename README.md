@@ -14,6 +14,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.
 - **Example routines** from Uzi's own training.
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
+- **Onboarding**: after the first sign in, nine questions for the coach (goal, max reps test or level, equipment, training days, session length, start date, age and weight, injuries, reminders), then a review. Answers can be changed in Settings.
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
 
@@ -43,6 +44,8 @@ Sign up and log in use [Supabase Auth](https://supabase.com/docs/guides/auth), p
 
 **Google sign in** (web) needs the Google provider turned on in Supabase (**Authentication → Sign In / Providers → Google**) with a Client ID and Secret from a Google Cloud OAuth client whose redirect URI is `https://tdfslnfurzqryyecxfik.supabase.co/auth/v1/callback`. On phones it comes with the phone phase.
 
+The onboarding answers are saved in the account's user metadata under `profile` (see `Profile` in `src/types.ts`), so they follow the user to any device and a server function can read them when it builds the plan. No table is needed for this.
+
 In Supabase, **Authentication → URL Configuration** must list the site address (the Vercel URL, and `http://localhost:8081` for local work) so confirmation and password reset links come back to the app.
 
 ## Deploy the web app (Vercel)
@@ -61,7 +64,8 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 | `src/lib/sound.ts` | Beeps, voice cues, vibration |
 | `src/components/BlockRunner.tsx` | The timer for each block format |
 | `src/components/BlockEditor.tsx` | Editing a block |
-| `src/screens/` | Home, Routines, Editor, Workout, Timers, History, Settings |
+| `src/screens/` | Home, Routines, Editor, Workout, Timers, History, Settings, Auth, Onboarding |
+| `src/lib/profile.ts` | Onboarding helpers: starting level from the max reps test, next training day |
 | `src/i18n/` | Spanish and English text |
 
 ## Notes

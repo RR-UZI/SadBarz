@@ -114,3 +114,44 @@ export interface Settings {
   keepAwake: boolean;
   volume: number; // 0..1
 }
+
+// ---------- Training profile (onboarding answers) ----------
+// The coach builds the weekly plan from these, so keep the values plain and stable.
+
+export type Goal = 'endurance' | 'skills' | 'statics' | 'fitness';
+export type Level = 'beginner' | 'intermediate' | 'advanced';
+export type Equipment = 'bar' | 'dips' | 'parallettes' | 'rings' | 'bands' | 'weights' | 'tubes' | 'none';
+export type Skill = 'handstand' | 'lsit' | 'frontLever' | 'backLever' | 'planche';
+export type Injury = 'shoulder' | 'elbow' | 'wrist' | 'lowerBack' | 'knee' | 'other';
+
+export interface MaxReps {
+  pullUps: number;
+  dips: number;
+  pushUps: number;
+  muscleUps: number;
+}
+
+export interface Profile {
+  version: 1;
+  goal: Goal;
+  /** From the max reps test, or picked by hand when they don't know their max. */
+  level: Level;
+  levelSource: 'test' | 'picked';
+  maxReps?: MaxReps;
+  skills: Skill[];
+  equipment: Equipment[];
+  /** 0 = Monday … 6 = Sunday. The count is the days per week. */
+  trainingDays: number[];
+  sessionMin: 30 | 45 | 60 | 90;
+  /** First day of the plan, YYYY-MM-DD. */
+  startDate: string;
+  age: number;
+  weightKg: number;
+  sex?: 'male' | 'female';
+  injuries: Injury[];
+  injuryNote?: string;
+  reminders: boolean;
+  /** HH:MM, local time. */
+  reminderTime: string;
+  updatedAt: string;
+}

@@ -4,12 +4,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { asProfile } from '../lib/profile';
 import { supabase } from '../lib/supabase';
+import type { Profile } from '../types';
 
 export interface Account {
   id: string;
   email: string;
   name: string;
+  /** Onboarding answers; null until onboarding is finished. */
+  profile: Profile | null;
 }
 
 // Each maps to an 'auth.error.*' string.
@@ -47,6 +51,8 @@ interface AuthValue {
   signInWithGoogle: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
   setNewPassword: (password: string) => Promise<AuthResult>;
+  /** Saves the onboarding answers to the account. */
+  saveProfile: (profile: Profile) => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -55,7 +61,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 const PREVIEW_ACCOUNTS = 'sadbarz:preview-accounts';
 const PREVIEW_SESSION = 'sadbarz:preview-session';
 
-type PreviewAccounts = Record<string, { id: string; name: string; hash: string }>;
+type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile }>;
 
 export function validEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
@@ -82,7 +88,7 @@ function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Recor
   // Email sign up stores `name`; Google fills `full_name` and `name`.
   const fromMeta = [meta.name, meta.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
   const name = fromMeta ?? email.split('@')[0];
-  return { id: u.id, email, name };
+  return { id: u.id, email, name, profile: asProfile(meta.profile) };
 }
 
 function mapError(e: { code?: string; message?: string; status?: number } | null | undefined): AuthError {
@@ -96,6 +102,10 @@ function mapError(e: { code?: string; message?: string; status?: number } | null
   if (code === 'email_address_invalid' || msg.includes('email')) return 'invalidEmail';
   if (msg.includes('fetch') || msg.includes('network')) return 'network';
   return 'unknown';
+}
+
+function previewUser(email: string, acc: PreviewAccounts[string]): Account {
+  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile) };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -132,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const email = await AsyncStorage.getItem(PREVIEW_SESSION);
         const accounts: PreviewAccounts = JSON.parse((await AsyncStorage.getItem(PREVIEW_ACCOUNTS)) ?? '{}');
-        if (email && accounts[email]) setUser({ id: accounts[email].id, email, name: accounts[email].name });
+        if (email && accounts[email]) setUser(previewUser(email, accounts[email]));
       } catch {
         // storage blocked: start signed out
       }
@@ -158,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const acc = accounts[email];
     if (!acc || acc.hash !== hashPassword(email, password)) return { ok: false, error: 'wrongLogin' };
     await AsyncStorage.setItem(PREVIEW_SESSION, email);
-    setUser({ id: acc.id, email, name: acc.name });
+    setUser(previewUser(email, acc));
     return { ok: true, value: undefined };
   }, []);
 
@@ -193,7 +203,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accounts[email] = { id, name, hash: hashPassword(email, password) };
     await AsyncStorage.setItem(PREVIEW_ACCOUNTS, JSON.stringify(accounts));
     await AsyncStorage.setItem(PREVIEW_SESSION, email);
-    setUser({ id, email, name });
+    setUser({ id, email, name, profile: null });
     return { ok: true, value: false };
   }, []);
 
@@ -238,6 +248,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const saveProfile = useCallback(
+    async (profile: Profile): Promise<AuthResult> => {
+      if (!user) return { ok: false, error: 'unknown' };
+      if (supabase) {
+        try {
+          // Kept in the account's metadata, so it follows the user to every device and the coach can read it.
+          const { data, error } = await supabase.auth.updateUser({ data: { profile } });
+          if (error) return { ok: false, error: mapError(error) };
+          setUser(fromSupabaseUser(data.user));
+          return { ok: true, value: undefined };
+        } catch {
+          return { ok: false, error: 'network' };
+        }
+      }
+      try {
+        const accounts: PreviewAccounts = JSON.parse((await AsyncStorage.getItem(PREVIEW_ACCOUNTS)) ?? '{}');
+        if (accounts[user.email]) {
+          accounts[user.email].profile = profile;
+          await AsyncStorage.setItem(PREVIEW_ACCOUNTS, JSON.stringify(accounts));
+        }
+      } catch {
+        // storage blocked: keep it for this visit only
+      }
+      setUser({ ...user, profile });
+      return { ok: true, value: undefined };
+    },
+    [user],
+  );
+
   const signOut = useCallback(async () => {
     if (supabase) {
       await supabase.auth.signOut().catch(() => {});
@@ -249,8 +288,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, signOut }),
-    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, signOut],
+    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, signOut }),
+    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
