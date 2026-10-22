@@ -237,6 +237,8 @@ export const es = {
   'auth.newPasswordTitle': 'Elige tu nueva contraseña',
   'auth.savePassword': 'Guardar contraseña',
   'auth.previewNoEmail': 'En modo prueba todavía no se mandan correos.',
+  'auth.google': 'Continuar con Google',
+  'auth.or': 'o con tu correo',
   'auth.preview': 'Modo prueba: la cuenta se guarda solo en este dispositivo.',
   'auth.error.invalidEmail': 'Revisa tu correo, no parece válido.',
   'auth.error.weakPassword': 'La contraseña necesita al menos {n} caracteres.',
@@ -245,6 +247,7 @@ export const es = {
   'auth.error.emailTaken': 'Ya hay una cuenta con ese correo. Inicia sesión.',
   'auth.error.notConfirmed': 'Confirma tu correo primero. Busca el enlace que te mandamos.',
   'auth.error.network': 'Sin conexión. Inténtalo de nuevo.',
+  'auth.error.linkFailed': 'No se pudo iniciar sesión con ese enlace. Inténtalo de nuevo.',
   'auth.error.unknown': 'Algo falló. Inténtalo de nuevo.',
 
   'settings.account': 'Cuenta',

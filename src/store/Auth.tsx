@@ -21,6 +21,7 @@ export type AuthError =
   | 'emailTaken'
   | 'notConfirmed'
   | 'network'
+  | 'linkFailed'
   | 'unknown';
 
 export type AuthResult<T = void> = { ok: true; value: T } | { ok: false; error: AuthError };
@@ -34,9 +35,16 @@ interface AuthValue {
   mode: 'online' | 'preview';
   /** The user opened a password reset link and must choose a new password. */
   recovering: boolean;
+  /** A sign in link (Google, email confirmation) came back with an error. */
+  linkError: AuthError | null;
+  clearLinkError: () => void;
   signIn: (email: string, password: string) => Promise<AuthResult>;
   /** value is true when the account still needs its email confirmed. */
   signUp: (name: string, email: string, password: string) => Promise<AuthResult<boolean>>;
+  /** Google sign in is available (web, with Supabase configured). */
+  canUseGoogle: boolean;
+  /** Leaves the page for Google and comes back signed in. */
+  signInWithGoogle: () => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
   setNewPassword: (password: string) => Promise<AuthResult>;
   signOut: () => Promise<void>;
@@ -70,7 +78,10 @@ function redirectUrl() {
 
 function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Account {
   const email = u.email ?? '';
-  const name = typeof u.user_metadata?.name === 'string' && u.user_metadata.name ? u.user_metadata.name : email.split('@')[0];
+  const meta = u.user_metadata ?? {};
+  // Email sign up stores `name`; Google fills `full_name` and `name`.
+  const fromMeta = [meta.name, meta.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
+  const name = fromMeta ?? email.split('@')[0];
   return { id: u.id, email, name };
 }
 
@@ -91,11 +102,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [ready, setReady] = useState(false);
   const [user, setUser] = useState<Account | null>(null);
   const [recovering, setRecovering] = useState(false);
+  const [linkError, setLinkError] = useState<AuthError | null>(null);
   const mode = supabase ? 'online' : 'preview';
 
   useEffect(() => {
     if (supabase) {
       const client = supabase;
+      // Google or an email link can come back with ?error=...&error_description=... (query or hash).
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const { search, hash, pathname } = window.location;
+        const params = new URLSearchParams(`${search.slice(1)}&${hash.slice(1)}`);
+        if (params.get('error') || params.get('error_description')) {
+          setLinkError('linkFailed');
+          window.history.replaceState(null, '', pathname);
+        }
+      }
       client.auth
         .getSession()
         .then(({ data }) => setUser(data.session ? fromSupabaseUser(data.session.user) : null))
@@ -176,6 +197,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { ok: true, value: false };
   }, []);
 
+  const canUseGoogle = !!supabase && Platform.OS === 'web';
+
+  const signInWithGoogle = useCallback(async (): Promise<AuthResult> => {
+    if (!supabase || Platform.OS !== 'web') return { ok: false, error: 'unknown' };
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: redirectUrl() } });
+      if (error) return { ok: false, error: mapError(error) };
+      return { ok: true, value: undefined };
+    } catch {
+      return { ok: false, error: 'network' };
+    }
+  }, []);
+
   const resetPassword = useCallback(async (rawEmail: string): Promise<AuthResult> => {
     const email = cleanEmail(rawEmail);
     if (!validEmail(email)) return { ok: false, error: 'invalidEmail' };
@@ -215,8 +249,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ ready, user, mode, recovering, signIn, signUp, resetPassword, setNewPassword, signOut }),
-    [ready, user, mode, recovering, signIn, signUp, resetPassword, setNewPassword, signOut],
+    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, signOut }),
+    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

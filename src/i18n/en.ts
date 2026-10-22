@@ -238,6 +238,8 @@ export const en: Record<StringKey, string> = {
   'auth.newPasswordTitle': 'Choose your new password',
   'auth.savePassword': 'Save password',
   'auth.previewNoEmail': 'Preview mode does not send emails yet.',
+  'auth.google': 'Continue with Google',
+  'auth.or': 'or with your email',
   'auth.preview': 'Preview mode: the account is saved on this device only.',
   'auth.error.invalidEmail': "Check your email, it doesn't look right.",
   'auth.error.weakPassword': 'The password needs at least {n} characters.',
@@ -246,6 +248,7 @@ export const en: Record<StringKey, string> = {
   'auth.error.emailTaken': 'There is already an account with that email. Log in instead.',
   'auth.error.notConfirmed': 'Confirm your email first. Look for the link we sent you.',
   'auth.error.network': 'No connection. Try again.',
+  'auth.error.linkFailed': "Couldn't sign in with that link. Try again.",
   'auth.error.unknown': 'Something went wrong. Try again.',
 
   'settings.account': 'Account',
