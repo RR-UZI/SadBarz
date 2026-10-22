@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
 import { Badge, Button, Card, Row, Screen, Section, Txt } from '../components/ui';
+import { WEEK_ROUTINE_IDS } from '../data/seed';
 import { useT } from '../i18n';
 import { formatLabel } from '../lib/blocks';
 import { startOfWeek } from '../lib/util';
@@ -21,6 +22,9 @@ export function HomeScreen() {
   const thisWeek = workouts.filter((w) => w.startedAt >= weekStart);
   const minutes = Math.round(thisWeek.reduce((s, w) => s + (w.finishedAt - w.startedAt), 0) / 60000);
   const last = workouts[0];
+  // The example week first (Monday to Friday, whatever order they're saved in), then the user's own.
+  const week = WEEK_ROUTINE_IDS.map((id) => routines.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r);
+  const quick = [...week, ...routines.filter((r) => !WEEK_ROUTINE_IDS.includes(r.id))].slice(0, 5);
 
   return (
     <Screen
@@ -65,7 +69,7 @@ export function HomeScreen() {
 
       <Section title={t('home.quickStart')}>
         <View style={{ gap: space.sm }}>
-          {routines.slice(0, 5).map((r) => (
+          {quick.map((r) => (
             <Card key={r.id} onPress={() => nav.push({ name: 'routine', id: r.id })} style={{ paddingVertical: space.md }}>
               <Row style={{ justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
