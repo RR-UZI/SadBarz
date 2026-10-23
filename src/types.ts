@@ -23,6 +23,8 @@ export interface BlockItem {
   weightKg?: number;
   max?: boolean; // "máximo": as many as possible
   note?: string; // DS, unbroken, explosivas, "resto del minuto: correr"...
+  /** Alternating blocks: items with the same turn are done together in one round. */
+  turn?: number;
 }
 
 // A row of the "sets" format: N sets of the same items, then rest.

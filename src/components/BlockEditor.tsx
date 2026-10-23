@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { blockDurationSec, newItem, newRow } from '../lib/blocks';
+import { blockDurationSec, itemTurns, newItem, newRow } from '../lib/blocks';
 import { clock, shortDuration } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
@@ -129,7 +129,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
             <ItemEditor
               key={it.id}
               item={it}
-              prefix={block.perRound === 'rotate' && block.format !== 'circuit' ? `${t('common.round')} ${i + 1}` : undefined}
+              prefix={block.perRound === 'rotate' && block.format !== 'circuit' ? `${t('common.round')} ${itemTurns(block)[i] + 1}` : undefined}
               exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
               kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
               onChange={(n) => set({ items: updateItem(block.items, n) })}
