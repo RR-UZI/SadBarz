@@ -3,7 +3,7 @@ import { View } from 'react-native';
 
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
-import { blockDurationSec, formatLabel, itemTarget } from '../lib/blocks';
+import { blockDurationSec, formatLabel, itemTarget, itemTurns } from '../lib/blocks';
 import { clock } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -51,6 +51,7 @@ export function BlockSummary({ block, index }: { block: Block; index?: number })
   const t = useT();
   const { exerciseById } = useApp();
   const dur = blockDurationSec(block);
+  const turns = itemTurns(block);
   const lines =
     block.format === 'sets'
       ? block.rows.map(
@@ -61,7 +62,7 @@ export function BlockSummary({ block, index }: { block: Block; index?: number })
         )
       : block.items.map(
           (it, i) =>
-            `${block.perRound === 'rotate' ? `${t('common.round')} ${i + 1}: ` : ''}${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? '?'}${
+            `${block.perRound === 'rotate' ? `${t('common.round')} ${turns[i] + 1}: ` : ''}${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? '?'}${
               it.weightKg ? ` +${it.weightKg}kg` : ''
             }${it.note ? ` (${it.note})` : ''}`,
         );

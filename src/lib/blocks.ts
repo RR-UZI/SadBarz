@@ -58,10 +58,29 @@ export function formatLabel(b: Block, roundsWord: string, setsWord: string): str
   }
 }
 
+// Alternating blocks take turns: one item per round, or several items that share a `turn`.
+// Returns the turn index (0-based) of each item.
+export function itemTurns(b: Block): number[] {
+  const keys: (number | string)[] = [];
+  return b.items.map((it, i) => {
+    const key = it.turn ?? `item${i}`;
+    if (!keys.includes(key)) keys.push(key);
+    return keys.indexOf(key);
+  });
+}
+
+function turnCount(b: Block) {
+  return new Set(itemTurns(b)).size;
+}
+
 // Which items are done in a given round (1-based) of an emom/tabata block.
 export function itemsForRound(b: Block, round: number): BlockItem[] {
   if (b.items.length === 0) return [];
-  if (b.perRound === 'rotate') return [b.items[(round - 1) % b.items.length]];
+  if (b.perRound === 'rotate') {
+    const turns = itemTurns(b);
+    const turn = (round - 1) % turnCount(b);
+    return b.items.filter((_, i) => turns[i] === turn);
+  }
   return b.items;
 }
 
@@ -90,9 +109,11 @@ export function defaultEntries(b: Block): LogEntry[] {
     return b.rows.flatMap((r) => r.items.map((it) => fromItem(it, r.sets)));
   }
   if (b.perRound === 'rotate' && b.items.length > 0) {
+    const turns = itemTurns(b);
+    const n = turnCount(b);
     return b.items.map((it, i) => {
-      // how many rounds land on this item when items take turns
-      const rounds = Math.floor(b.rounds / b.items.length) + (i < b.rounds % b.items.length ? 1 : 0);
+      // how many rounds land on this item's turn when turns alternate
+      const rounds = Math.floor(b.rounds / n) + (turns[i] < b.rounds % n ? 1 : 0);
       return fromItem(it, rounds);
     });
   }

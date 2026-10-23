@@ -140,7 +140,12 @@ export function seedRoutines(): Routine[] {
         circuit('Primera parte · 1', 2, [it('ex_fondos', { reps: 30 }), it('ex_muscle', { reps: 10 }), it('ex_boxjump', { reps: 20 }), it('ex_pull', { reps: 15 }), it('ex_push', { reps: 30 })], 120, 'Unbroken cada ejercicio.'),
         circuit('Primera parte · 2', 2, [it('ex_fondos', { reps: 25 }), it('ex_muscle', { reps: 8 }), it('ex_boxjump', { reps: 20 }), it('ex_pull', { reps: 12 }), it('ex_push', { reps: 25 })], 120, 'Unbroken cada ejercicio.'),
         circuit('Primera parte · 3', 2, [it('ex_fondos', { reps: 20 }), it('ex_muscle', { reps: 6 }), it('ex_boxjump', { reps: 20 }), it('ex_pull', { reps: 10 }), it('ex_push', { reps: 20 })], 180, 'Sin descanso.'),
-        emom('Segunda parte', 90, 10, 'all', [it('ex_muscle', { reps: 5 }), it('ex_bardips', { reps: 10 }), it('ex_pull', { reps: 5 }), it('ex_burpees', { reps: 15 })], 120),
+        emom('Segunda parte', 90, 10, 'rotate', [
+          it('ex_muscle', { reps: 5, turn: 1 }),
+          it('ex_bardips', { reps: 10, turn: 1 }),
+          it('ex_pull', { reps: 5, turn: 1 }),
+          it('ex_burpees', { reps: 15, turn: 2 }),
+        ], 120),
         emom('Correr', 600, 1, 'all', [it('ex_correr', { note: '10 min' })]),
       ],
     },
