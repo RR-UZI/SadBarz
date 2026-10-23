@@ -12,7 +12,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **Timers tab**: EMOM, Tabata / intervals, countdown and stopwatch without a routine.
 - **History**: last 2 weeks (Free plan).
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.
-- **Example routines** from Uzi's own training, one per weekday: Monday weighted push and pull, Tuesday tubes, reps and cardio, Wednesday legs and abs, Thursday reps to failure, Friday full body.
+- **Example routines** from Uzi's own training, one per weekday: Monday weighted push and pull, Tuesday tubes, reps and cardio, Wednesday legs and abs, Thursday pull, push and tubes, Friday full body.
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
 - **Onboarding**: after the first sign in, nine questions for the coach (goal, max reps test or level, equipment, training days, session length, start date, age and weight, injuries, reminders), then a review. Answers can be changed in Settings.
 
