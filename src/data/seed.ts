@@ -71,8 +71,8 @@ function sets(title: string, rows: SetRow[], restAfterSec?: number, note?: strin
   return { id: id('bl'), title, format: 'sets', items: [], rows, intervalSec: 60, rounds: 1, perRound: 'all', workSec: 20, restSec: 10, restAfterSec, note };
 }
 
-function circuit(title: string, rounds: number, items: BlockItem[], restAfterSec?: number): Block {
-  return { id: id('bl'), title, format: 'circuit', items, rows: [], intervalSec: 60, rounds, perRound: 'all', workSec: 20, restSec: 10, restAfterSec };
+function circuit(title: string, rounds: number, items: BlockItem[], restAfterSec?: number, note?: string): Block {
+  return { id: id('bl'), title, format: 'circuit', items, rows: [], intervalSec: 60, rounds, perRound: 'all', workSec: 20, restSec: 10, restAfterSec, note };
 }
 
 /** The example week, Monday to Friday. Home lists these first, in this order. */
@@ -80,7 +80,7 @@ export const WEEK_ROUTINE_IDS = [
   'rt_seed_lunes_emom50',
   'rt_seed_martes_em2m',
   'rt_seed_miercoles_pierna',
-  'rt_seed_jueves_reps',
+  'rt_seed_jueves_pullpush',
   'rt_seed_viernes_full',
 ];
 
@@ -132,34 +132,16 @@ export function seedRoutines(): Routine[] {
     },
     {
       ...base,
-      id: 'rt_seed_jueves_reps',
-      name: 'Jueves · Reps a muerte',
-      note: 'Unbroken. Última serie: máximo sin parar.',
+      id: 'rt_seed_jueves_pullpush',
+      name: 'Jueves · Pull, push y tubo',
+      note: 'Primera parte: rondas de volumen, cada ejercicio unbroken. Segunda parte: EMOM cada 1:30. Cierra corriendo 10 min.',
       blocks: [
-        sets('Fondos', [
-          row(4, [it('ex_fondos', { reps: 30 })], 30),
-          row(3, [it('ex_fondos', { reps: 40 })], 50),
-          row(2, [it('ex_fondos', { reps: 50 })], 60),
-          row(1, [it('ex_fondos', { max: true })], 0),
-        ], 180),
-        sets('Muscle ups', [
-          row(4, [it('ex_muscle', { reps: 8 })], 30),
-          row(3, [it('ex_muscle', { reps: 12 })], 50),
-          row(2, [it('ex_muscle', { reps: 16 })], 60),
-          row(1, [it('ex_muscle', { max: true })], 0),
-        ], 180),
-        sets('Push ups', [
-          row(4, [it('ex_push', { reps: 40 })], 30),
-          row(3, [it('ex_push', { reps: 50 })], 50),
-          row(2, [it('ex_push', { reps: 60 })], 60),
-          row(1, [it('ex_push', { max: true })], 0),
-        ], 180),
-        sets('Pull ups', [
-          row(4, [it('ex_pull', { reps: 15 })], 30),
-          row(3, [it('ex_pull', { reps: 20 })], 50),
-          row(2, [it('ex_pull', { reps: 25 })], 60),
-          row(1, [it('ex_pull', { max: true })], 0),
-        ]),
+        circuit('Calentamiento', 3, [it('ex_fondos', { reps: 10 }), it('ex_muscle', { reps: 4 }), it('ex_boxjump', { reps: 10 }), it('ex_pull', { reps: 6 }), it('ex_push', { reps: 10 })], 120, 'A tu ritmo, controlando cada repetición.'),
+        circuit('Primera parte · 1', 2, [it('ex_fondos', { reps: 30 }), it('ex_muscle', { reps: 10 }), it('ex_boxjump', { reps: 20 }), it('ex_pull', { reps: 15 }), it('ex_push', { reps: 30 })], 120, 'Unbroken cada ejercicio.'),
+        circuit('Primera parte · 2', 2, [it('ex_fondos', { reps: 25 }), it('ex_muscle', { reps: 8 }), it('ex_boxjump', { reps: 20 }), it('ex_pull', { reps: 12 }), it('ex_push', { reps: 25 })], 120, 'Unbroken cada ejercicio.'),
+        circuit('Primera parte · 3', 2, [it('ex_fondos', { reps: 20 }), it('ex_muscle', { reps: 6 }), it('ex_boxjump', { reps: 20 }), it('ex_pull', { reps: 10 }), it('ex_push', { reps: 20 })], 180, 'Sin descanso.'),
+        emom('Segunda parte', 90, 10, 'all', [it('ex_muscle', { reps: 5 }), it('ex_bardips', { reps: 10 }), it('ex_pull', { reps: 5 }), it('ex_burpees', { reps: 15 })], 120),
+        emom('Correr', 600, 1, 'all', [it('ex_correr', { note: '10 min' })]),
       ],
     },
     {

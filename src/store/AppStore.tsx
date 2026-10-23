@@ -9,7 +9,7 @@ import type { Exercise, Routine, Settings, Workout } from '../types';
 
 const STORAGE_KEY = 'sadbarz:v1';
 // Bumped when a default changes and saved settings should follow it (2: 10 s lead-in).
-const DATA_VERSION = 3;
+const DATA_VERSION = 4;
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'es',
@@ -77,8 +77,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           const custom = (saved.exercises ?? []).filter((e) => e.custom);
           setData({
             exercises: [...SEED_EXERCISES, ...custom],
-            // v3: the examples became one routine per weekday, Monday to Friday.
-            routines: saved.routines ? ((saved.version ?? 1) < 3 ? withNewExamples(saved.routines) : saved.routines) : seedRoutines(),
+            // v3: the examples became one routine per weekday, Monday to Friday. v4: new Thursday.
+            routines: saved.routines ? ((saved.version ?? 1) < 4 ? withNewExamples(saved.routines) : saved.routines) : seedRoutines(),
             workouts: saved.workouts ?? [],
             settings,
           });
