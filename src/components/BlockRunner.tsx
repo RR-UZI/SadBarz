@@ -370,15 +370,22 @@ function SetsRunner({ block, onFinish }: Props) {
 
 // ---------- Circuit (stopwatch + rounds) ----------
 
+// Seconds counted down before the next round starts, once the athlete says they are ready.
+const NEXT_ROUND_COUNTDOWN = 3;
+
 function CircuitRunner({ block, onFinish }: Props) {
   const t = useT();
   const { settings } = useApp();
   const cues = useCues(settings);
   const c = useClock(100);
   const [round, setRound] = useState(1);
-  // Time on the stopwatch when each round was finished, so every round gets its own split.
-  const [splits, setSplits] = useState<number[]>([]);
-  const [flash, setFlash] = useState<{ round: number; sec: number } | null>(null);
+  // Each finished round's own time; the break between rounds is not counted in it.
+  const [roundTimes, setRoundTimes] = useState<number[]>([]);
+  const [roundStart, setRoundStart] = useState(0);
+  // 'rest': a round was just finished and we wait for "start next round".
+  // 'countdown': 3, 2, 1 before the next round's stopwatch starts.
+  const [phase, setPhase] = useState<'work' | 'rest' | 'countdown'>('work');
+  const [phaseStart, setPhaseStart] = useState(0);
   const lastTick = useRef('');
   const started = useRef(false);
 
@@ -388,15 +395,12 @@ function CircuitRunner({ block, onFinish }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The "round done" banner stays up for a moment, then the next round takes over.
-  useEffect(() => {
-    if (!flash) return;
-    const id = setTimeout(() => setFlash(null), 2500);
-    return () => clearTimeout(id);
-  }, [flash]);
-
   const sec = c.elapsedMs / 1000;
   const lead = settings.leadInSec - sec;
+  const workSec = Math.max(0, sec - settings.leadInSec);
+  const roundSec = workSec - roundStart;
+  const countdown = NEXT_ROUND_COUNTDOWN - (workSec - phaseStart);
+  const isLast = round >= block.rounds;
 
   useEffect(() => {
     if (lead > 0) {
@@ -408,13 +412,20 @@ function CircuitRunner({ block, onFinish }: Props) {
     } else if (!started.current) {
       started.current = true;
       cues.start();
+    } else if (phase === 'countdown') {
+      if (countdown > 0) {
+        const whole = Math.ceil(countdown);
+        if (`r${round}:${whole}` !== lastTick.current) {
+          lastTick.current = `r${round}:${whole}`;
+          cues.tick();
+        }
+      } else {
+        setPhase('work');
+        setRoundStart(workSec);
+        cues.round(round);
+      }
     }
   });
-
-  const workSec = Math.max(0, sec - settings.leadInSec);
-  const roundStart = splits.length ? splits[splits.length - 1] : 0;
-  const roundSec = workSec - roundStart;
-  const isLast = round >= block.rounds;
 
   const roundDone = () => {
     if (isLast) {
@@ -422,28 +433,52 @@ function CircuitRunner({ block, onFinish }: Props) {
       onFinish(Math.round(workSec));
       return;
     }
-    cues.round(round + 1);
-    setSplits([...splits, workSec]);
-    setFlash({ round, sec: roundSec });
+    cues.rest();
+    setRoundTimes([...roundTimes, roundSec]);
     setRound(round + 1);
+    setPhase('rest');
+    setPhaseStart(workSec);
   };
+
+  const startNext = () => {
+    unlockAudio();
+    if (!c.running) c.start();
+    setPhase('countdown');
+    setPhaseStart(workSec);
+  };
+
+  const lastTime = roundTimes[roundTimes.length - 1] ?? 0;
 
   return (
     <View>
       {block.rounds > 1 ? <RoundDots total={block.rounds} done={round - 1} /> : null}
       {lead > 0 ? (
         <BigClock seconds={lead} color={colors.warn} label={t('run.getReady')} />
-      ) : flash ? (
+      ) : phase === 'rest' ? (
         <View accessibilityRole="alert" style={{ alignItems: 'center', paddingVertical: space.lg, gap: 6 }}>
           <View style={{ backgroundColor: colors.success, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 6 }}>
             <Txt style={{ fontWeight: '800', fontSize: 18 }} color={colors.accentText}>
-              {t('run.roundComplete', { n: flash.round })}
+              {t('run.roundComplete', { n: round - 1 })}
             </Txt>
           </View>
           <Txt style={{ fontSize: 64, fontWeight: '800', fontVariant: ['tabular-nums'] }} color={colors.success}>
-            {clock(flash.sec)}
+            {clock(lastTime)}
           </Txt>
-          <Txt variant="h2">{t('run.nextRound', { n: round, total: block.rounds })}</Txt>
+          <Txt variant="small" color={colors.muted}>
+            {`${t('run.restTime')} ${clock(workSec - phaseStart)}`}
+          </Txt>
+          <Txt variant="h2" style={{ textAlign: 'center', marginTop: space.sm }}>
+            {t('run.readyNext', { n: round, total: block.rounds })}
+          </Txt>
+        </View>
+      ) : phase === 'countdown' ? (
+        <View accessibilityRole="alert" style={{ alignItems: 'center', paddingVertical: space.lg }}>
+          <Txt variant="label" color={colors.warn}>
+            {t('run.startsIn', { n: round })}
+          </Txt>
+          <Txt style={{ fontSize: 140, fontWeight: '900', color: colors.warn, fontVariant: ['tabular-nums'], lineHeight: 156 }}>
+            {Math.max(1, Math.ceil(countdown))}
+          </Txt>
         </View>
       ) : (
         <View>
@@ -456,27 +491,31 @@ function CircuitRunner({ block, onFinish }: Props) {
             seconds={roundSec}
             color={colors.accent}
             label={t('run.stopwatch')}
-            sub={splits.length ? `${t('run.total')} ${clock(workSec)}` : undefined}
+            sub={roundTimes.length ? `${t('run.total')} ${clock(workSec)}` : undefined}
           />
         </View>
       )}
-      <ItemLines items={block.items} big={block.items.length <= 3} />
-      {splits.length ? (
+      <ItemLines items={block.items} big={block.items.length <= 3} dim={phase !== 'work'} />
+      {roundTimes.length ? (
         <Row style={{ justifyContent: 'center', flexWrap: 'wrap', marginTop: space.md }} gap={space.md}>
-          {splits.map((end, i) => (
+          {roundTimes.map((time, i) => (
             <Txt key={i} variant="small" color={colors.muted}>
-              {`R${i + 1} ${clock(end - (i ? splits[i - 1] : 0))}`}
+              {`R${i + 1} ${clock(time)}`}
             </Txt>
           ))}
         </Row>
       ) : null}
-      <Button
-        label={block.rounds > 1 ? (isLast ? t('run.lastRoundDone') : t('run.roundDoneOf', { n: round, total: block.rounds })) : t('run.roundDone')}
-        size="lg"
-        style={{ marginTop: space.xl }}
-        onPress={roundDone}
-        disabled={lead > 0}
-      />
+      {phase === 'rest' ? (
+        <Button label={t('run.startRound', { n: round })} size="lg" style={{ marginTop: space.xl }} onPress={startNext} />
+      ) : (
+        <Button
+          label={block.rounds > 1 ? (isLast ? t('run.lastRoundDone') : t('run.roundDoneOf', { n: round, total: block.rounds })) : t('run.roundDone')}
+          size="lg"
+          style={{ marginTop: space.xl }}
+          onPress={roundDone}
+          disabled={lead > 0 || phase === 'countdown'}
+        />
+      )}
       <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={() => onFinish(Math.round(workSec))} />
     </View>
   );
