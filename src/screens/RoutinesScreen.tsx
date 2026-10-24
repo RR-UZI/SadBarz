@@ -73,7 +73,7 @@ export function BlockSummary({ block, index }: { block: Block; index?: number })
           {index != null ? `${index + 1}. ` : ''}
           {block.title || formatLabel(block, t('common.rounds'), t('common.sets'))}
         </Txt>
-        {dur > 0 && block.format !== 'sets' ? <Txt variant="small" color={colors.muted}>{clock(dur)}</Txt> : null}
+        {dur > 0 && block.format !== 'sets' && block.format !== 'amrap' ? <Txt variant="small" color={colors.muted}>{clock(dur)}</Txt> : null}
       </Row>
       {block.title ? (
         <Txt variant="small" color={colors.accent}>

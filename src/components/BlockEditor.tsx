@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { blockDurationSec, itemTurns, newItem, newRow } from '../lib/blocks';
+import { blockDurationSec, DEFAULT_AMRAP_SEC, itemTurns, newItem, newRow } from '../lib/blocks';
 import { clock, shortDuration } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
@@ -13,6 +13,7 @@ import { Button, Chip, Field, NumberField, Row, Segmented, Txt } from './ui';
 
 const INTERVALS = [20, 30, 40, 45, 50, 60, 90, 120];
 const BREAKS = [0, 60, 120, 180, 240, 300];
+const CAPS = [5, 8, 10, 12, 15, 20, 30]; // AMRAP time caps, minutes
 
 export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
   const t = useT();
@@ -32,6 +33,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
       patch.items = block.rows.flatMap((r) => r.items);
     }
     if (format === 'tabata' && block.format !== 'tabata') patch.rounds = 8;
+    if (format === 'amrap' && !block.capSec) patch.capSec = DEFAULT_AMRAP_SEC;
     set(patch);
   };
 
@@ -46,7 +48,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
   const removeItem = (list: BlockItem[], id: string) => list.filter((x) => x.id !== id);
   const updateRow = (row: SetRow) => set({ rows: block.rows.map((r) => (r.id === row.id ? row : r)) });
 
-  const formats: BlockFormat[] = ['emom', 'tabata', 'sets', 'circuit'];
+  const formats: BlockFormat[] = ['emom', 'tabata', 'sets', 'circuit', 'amrap'];
   const dur = blockDurationSec(block);
 
   return (
@@ -98,6 +100,20 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
             <Txt style={{ fontWeight: '800', paddingVertical: 8 }}>{clock(dur)}</Txt>
           </View>
         </Row>
+      )}
+
+      {block.format === 'amrap' && (
+        <View style={{ gap: space.md }}>
+          <Txt variant="small" color={colors.muted}>
+            {t('block.timeCap')}
+          </Txt>
+          <Row style={{ flexWrap: 'wrap' }}>
+            {CAPS.map((m) => (
+              <Chip key={m} label={`${m} min`} active={dur === m * 60} onPress={() => set({ capSec: m * 60 })} />
+            ))}
+          </Row>
+          <NumberField label={t('timers.minutes')} value={Math.round(dur / 60)} min={1} max={120} onChange={(v) => set({ capSec: (v ?? 10) * 60 })} />
+        </View>
       )}
 
       {block.format === 'circuit' && <NumberField label={t('block.rounds')} value={block.rounds} min={1} max={100} onChange={(v) => set({ rounds: v ?? 1 })} />}

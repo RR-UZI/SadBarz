@@ -1,6 +1,8 @@
 // Helpers to create, describe and time blocks.
 import type { Block, BlockFormat, BlockItem, Exercise, LogEntry, SetRow } from '../types';
-import { shortDuration, uid } from './util';
+import { clock, shortDuration, uid } from './util';
+
+export const DEFAULT_AMRAP_SEC = 600;
 
 export function newItem(exerciseId: string, kind: Exercise['kind'] = 'reps'): BlockItem {
   const item: BlockItem = { id: uid('it'), exerciseId };
@@ -26,6 +28,7 @@ export function newBlock(format: BlockFormat = 'emom'): Block {
     perRound: 'all',
     workSec: 20,
     restSec: 10,
+    ...(format === 'amrap' ? { capSec: DEFAULT_AMRAP_SEC } : {}),
   };
 }
 
@@ -39,6 +42,8 @@ export function blockDurationSec(b: Block): number {
       return b.rows.reduce((sum, r) => sum + r.sets * (45 + r.restSec), 0); // rough estimate
     case 'circuit':
       return 0;
+    case 'amrap':
+      return b.capSec ?? DEFAULT_AMRAP_SEC;
   }
 }
 
@@ -55,7 +60,14 @@ export function formatLabel(b: Block, roundsWord: string, setsWord: string): str
       return `${b.rows.reduce((n, r) => n + r.sets, 0)} ${setsWord}`;
     case 'circuit':
       return `Circuito · ${b.rounds} ${roundsWord}`;
+    case 'amrap':
+      return `AMRAP ${capLabel(b.capSec ?? DEFAULT_AMRAP_SEC)}`;
   }
+}
+
+// '12 min', or '7:30' when the cap is not whole minutes.
+export function capLabel(sec: number): string {
+  return sec % 60 === 0 ? `${sec / 60} min` : clock(sec);
 }
 
 // Alternating blocks take turns: one item per round, or several items that share a `turn`.
@@ -95,7 +107,8 @@ export function itemTarget(item: BlockItem, maxWord: string): string {
 }
 
 // Pre-filled log entries for a finished block: what the plan said, all rounds done.
-export function defaultEntries(b: Block): LogEntry[] {
+// For an AMRAP, `roundsDone` is how many full rounds were finished.
+export function defaultEntries(b: Block, roundsDone?: number): LogEntry[] {
   const fromItem = (it: BlockItem, rounds: number): LogEntry => ({
     exerciseId: it.exerciseId,
     rounds,
@@ -105,6 +118,9 @@ export function defaultEntries(b: Block): LogEntry[] {
     calories: it.calories,
     weightKg: it.weightKg,
   });
+  if (b.format === 'amrap') {
+    return b.items.map((it) => fromItem(it, roundsDone ?? 0));
+  }
   if (b.format === 'sets') {
     return b.rows.flatMap((r) => r.items.map((it) => fromItem(it, r.sets)));
   }

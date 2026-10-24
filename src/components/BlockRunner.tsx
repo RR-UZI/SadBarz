@@ -1,18 +1,18 @@
-// Runs one block with its timer: EMOM / interval, Tabata, sets with rest, or circuit.
+// Runs one block with its timer: EMOM / interval, Tabata, sets with rest, circuit or AMRAP.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { useT } from '../i18n';
-import { buildTimeline, flattenSets, itemTarget, itemsForRound, segmentAt, timelineLength } from '../lib/blocks';
+import { buildTimeline, capLabel, DEFAULT_AMRAP_SEC, flattenSets, itemTarget, itemsForRound, segmentAt, timelineLength } from '../lib/blocks';
 import { sounds, speak, unlockAudio } from '../lib/sound';
 import { useClock } from '../lib/useClock';
 import { clock } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
-import type { Block, BlockItem, Settings } from '../types';
-import { Button, Row, Txt } from './ui';
+import type { AmrapScore, Block, BlockItem, Settings } from '../types';
+import { Button, NumberField, Row, Txt } from './ui';
 
-type Props = { block: Block; onFinish: (durationSec: number) => void };
+type Props = { block: Block; onFinish: (durationSec: number, score?: AmrapScore) => void };
 
 // The lead-in counts down silently and beeps only on its last seconds (3, 2, 1).
 const LEAD_BEEPS = 3;
@@ -20,6 +20,7 @@ const LEAD_BEEPS = 3;
 export function BlockRunner(props: Props) {
   if (props.block.format === 'sets') return <SetsRunner {...props} />;
   if (props.block.format === 'circuit') return <CircuitRunner {...props} />;
+  if (props.block.format === 'amrap') return <AmrapRunner {...props} />;
   return <TimedRunner {...props} />;
 }
 
@@ -517,6 +518,134 @@ function CircuitRunner({ block, onFinish }: Props) {
         />
       )}
       <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={() => onFinish(Math.round(workSec))} />
+    </View>
+  );
+}
+
+// ---------- AMRAP ----------
+
+// Beeps on the last seconds of the time cap, and the clock turns orange for the final stretch.
+const AMRAP_FINAL_SEC = 10;
+
+function AmrapRunner({ block, onFinish }: Props) {
+  const t = useT();
+  const { settings } = useApp();
+  const cues = useCues(settings);
+  const c = useClock(100);
+  const cap = block.capSec ?? DEFAULT_AMRAP_SEC;
+  // Time on the clock when each round was finished.
+  const [splits, setSplits] = useState<number[]>([]);
+  const [over, setOver] = useState(false);
+  const [extraReps, setExtraReps] = useState(0);
+  const lastTick = useRef('');
+  const started = useRef(false);
+
+  useEffect(() => {
+    unlockAudio();
+    c.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sec = c.elapsedMs / 1000;
+  const lead = settings.leadInSec - sec;
+  const workSec = Math.min(cap, Math.max(0, sec - settings.leadInSec));
+  const left = cap - workSec;
+  const rounds = splits.length;
+
+  const stop = () => {
+    c.pause();
+    setOver(true);
+  };
+
+  useEffect(() => {
+    if (over) return;
+    if (lead > 0) {
+      const whole = Math.ceil(lead);
+      if (`l${whole}` !== lastTick.current && whole <= Math.min(LEAD_BEEPS, settings.leadInSec)) {
+        lastTick.current = `l${whole}`;
+        cues.tick();
+      }
+      return;
+    }
+    if (!started.current) {
+      started.current = true;
+      cues.start();
+    }
+    if (left <= 0) {
+      cues.end();
+      stop();
+      return;
+    }
+    const whole = Math.ceil(left);
+    if (whole <= LEAD_BEEPS && `e${whole}` !== lastTick.current) {
+      lastTick.current = `e${whole}`;
+      cues.tick();
+    }
+  });
+
+  const addRound = () => {
+    if (settings.roundSound) sounds.round(settings.vibration);
+    setSplits([...splits, workSec]);
+  };
+
+  if (over) {
+    return (
+      <View style={{ alignItems: 'center', gap: space.md, paddingVertical: space.lg }}>
+        <Txt variant="title" color={colors.success}>
+          {t('run.timeUp')}
+        </Txt>
+        <Txt style={{ fontSize: 96, fontWeight: '900', lineHeight: 108, fontVariant: ['tabular-nums'] }} color={colors.accent}>
+          {rounds}
+        </Txt>
+        <Txt variant="h2">{t('run.amrapRounds', { n: rounds })}</Txt>
+        <View style={{ marginTop: space.md }}>
+          <NumberField label={t('run.extraReps')} value={extraReps} min={0} max={999} width={80} onChange={(v) => setExtraReps(v ?? 0)} />
+        </View>
+        <Txt variant="h2" color={colors.accent} style={{ marginTop: space.sm }}>
+          {t('run.score', { rounds, reps: extraReps })}
+        </Txt>
+        <Button
+          label={t('run.saveScore')}
+          size="lg"
+          style={{ marginTop: space.lg, alignSelf: 'stretch' }}
+          onPress={() => onFinish(Math.round(workSec), { rounds, reps: extraReps })}
+        />
+      </View>
+    );
+  }
+
+  const final = lead <= 0 && left <= AMRAP_FINAL_SEC;
+  return (
+    <View>
+      <Txt variant="label" color={colors.muted} style={{ textAlign: 'center' }}>
+        {`AMRAP ${capLabel(cap)}`}
+      </Txt>
+      {lead > 0 ? (
+        <BigClock seconds={lead} color={colors.warn} label={t('run.getReady')} />
+      ) : (
+        <BigClock seconds={left} color={final ? colors.warn : colors.accent} label={t('run.timeLeft')} />
+      )}
+      <View style={{ alignItems: 'center', marginBottom: space.md }}>
+        <Txt variant="label" color={colors.muted}>
+          {t('run.fullRounds')}
+        </Txt>
+        <Txt style={{ fontSize: 56, fontWeight: '900', lineHeight: 64, fontVariant: ['tabular-nums'] }}>{rounds}</Txt>
+      </View>
+      <ItemLines items={block.items} big={block.items.length <= 3} />
+      {splits.length ? (
+        <Row style={{ justifyContent: 'center', flexWrap: 'wrap', marginTop: space.md }} gap={space.md}>
+          {splits.map((end, i) => (
+            <Txt key={i} variant="small" color={colors.muted}>
+              {`R${i + 1} ${clock(end - (i ? splits[i - 1] : 0))}`}
+            </Txt>
+          ))}
+        </Row>
+      ) : null}
+      <Button label={t('run.addRound')} size="lg" style={{ marginTop: space.xl, minHeight: 72 }} onPress={addRound} disabled={lead > 0} />
+      {rounds > 0 ? (
+        <Button label={t('run.undoRound')} variant="ghost" size="sm" style={{ marginTop: space.sm, alignSelf: 'center' }} onPress={() => setSplits(splits.slice(0, -1))} />
+      ) : null}
+      <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={stop} />
     </View>
   );
 }

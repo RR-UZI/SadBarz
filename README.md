@@ -1,13 +1,13 @@
 # SadBarz
 
-Calisthenics app and personal coach: build routines, run them with built-in timers (EMOM, EM2M, Tabata, sets with rest, circuits), log every set, and (with Pro, coming later) let the coach make the next session harder as you get stronger.
+Calisthenics app and personal coach: build routines, run them with built-in timers (EMOM, EM2M, Tabata, sets with rest, circuits, AMRAP), log every set, and (with Pro, coming later) let the coach make the next session harder as you get stronger.
 
 One codebase for web, iPhone and Android (Expo / React Native). Spanish first, switchable to English in Settings. Dark theme.
 
 ## What works now (web prototype, Free features)
 
 - **Routines**: create, edit, duplicate, delete. A routine is a list of blocks.
-- **Block formats**: EMOM / every N seconds (E30", E50", EM2M...), Tabata (work / rest), sets with rest (pyramids, weighted work, pairs), circuit (stopwatch + rounds; after each round it asks to start the next one, then counts down 3 seconds). Each exercise can have reps, seconds, meters, calories, added weight (+kg), "max" and a note (DS, unbroken...).
+- **Block formats**: EMOM / every N seconds (E30", E50", EM2M...), Tabata (work / rest), sets with rest (pyramids, weighted work, pairs), circuit (stopwatch + rounds; after each round it asks to start the next one, then counts down 3 seconds), AMRAP (time cap countdown, "+1 ronda" counter, extra reps at the end; the score "5 rondas + 8 reps" is saved to the history). Each exercise can have reps, seconds, meters, calories, added weight (+kg), "max" and a note (DS, unbroken...).
 - **Workout mode**: the timer runs inside the routine. 10-second get-ready countdown (beeps on 3-2-1), start sound, sound every round, last-seconds beeps, end sound. After each block: Done (reps and weight pre-filled, editable), Repeat, Skip, or Finish workout. Then a 1, 2, 3 or 5 min break (the routine's own rest highlighted), and the next block waits for Start.
 - **Timers tab**: EMOM, Tabata / intervals, countdown and stopwatch without a routine.
 - **History**: last 2 weeks (Free plan).

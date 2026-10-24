@@ -16,7 +16,7 @@ import { clock, uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
-import type { Block, BlockLog, LogEntry, Workout } from '../types';
+import type { AmrapScore, Block, BlockLog, LogEntry, Workout } from '../types';
 import { BlockSummary } from './RoutinesScreen';
 
 type Phase =
@@ -51,6 +51,7 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
   const [phase, setPhase] = useState<Phase>({ kind: 'ready' });
   const [logs, setLogs] = useState<BlockLog[]>([]);
   const [entries, setEntries] = useState<LogEntry[]>([]);
+  const [score, setScore] = useState<AmrapScore | undefined>();
   const startedAt = useRef(Date.now());
   const runCount = useRef(0);
 
@@ -74,6 +75,7 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
   const addLog = (status: BlockLog['status'], durationSec: number, e: LogEntry[]) => {
     if (!block) return logs;
     const log: BlockLog = { blockId: block.id, title: block.title || '', format: block.format, status, durationSec, entries: e };
+    if (score && status === 'done') log.score = score;
     const next = [...logs, log];
     setLogs(next);
     return next;
@@ -154,8 +156,9 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
         <BlockRunner
           key={phase.run}
           block={block}
-          onFinish={(durationSec) => {
-            setEntries(defaultEntries(block));
+          onFinish={(durationSec, amrap) => {
+            setEntries(defaultEntries(block, amrap?.rounds));
+            setScore(amrap);
             setPhase({ kind: 'review', durationSec });
           }}
         />
@@ -175,6 +178,11 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
           <Txt variant="label" style={{ marginTop: space.lg, marginBottom: space.sm }}>
             {t('run.checkWhatYouDid')}
           </Txt>
+          {score ? (
+            <Txt variant="h2" color={colors.accent} style={{ marginBottom: space.sm }}>
+              {`AMRAP · ${t('run.score', { rounds: score.rounds, reps: score.reps })}`}
+            </Txt>
+          ) : null}
           <EntryEditor entries={entries} onChange={setEntries} sets={block.format === 'sets'} />
         </Card>
 
