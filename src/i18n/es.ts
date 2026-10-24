@@ -373,6 +373,11 @@ export const es = {
   'settings.editProfile': 'Editar respuestas',
   'home.coachReady': 'Tu perfil está listo. El coach armará tu plan semanal con tus respuestas.',
   'home.viewProfile': 'Ver mis respuestas',
+  'run.roundComplete': '✓ Ronda {n} hecha',
+  'run.nextRound': 'Ronda {n} de {total}, ¡vamos!',
+  'run.roundDoneOf': 'Terminé la ronda {n} de {total}',
+  'run.lastRoundDone': 'Terminé la última ronda',
+  'run.total': 'Total',
 };
 
 export type StringKey = keyof typeof es;
