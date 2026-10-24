@@ -376,6 +376,9 @@ function CircuitRunner({ block, onFinish }: Props) {
   const cues = useCues(settings);
   const c = useClock(100);
   const [round, setRound] = useState(1);
+  // Time on the stopwatch when each round was finished, so every round gets its own split.
+  const [splits, setSplits] = useState<number[]>([]);
+  const [flash, setFlash] = useState<{ round: number; sec: number } | null>(null);
   const lastTick = useRef('');
   const started = useRef(false);
 
@@ -384,6 +387,13 @@ function CircuitRunner({ block, onFinish }: Props) {
     c.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The "round done" banner stays up for a moment, then the next round takes over.
+  useEffect(() => {
+    if (!flash) return;
+    const id = setTimeout(() => setFlash(null), 2500);
+    return () => clearTimeout(id);
+  }, [flash]);
 
   const sec = c.elapsedMs / 1000;
   const lead = settings.leadInSec - sec;
@@ -402,31 +412,103 @@ function CircuitRunner({ block, onFinish }: Props) {
   });
 
   const workSec = Math.max(0, sec - settings.leadInSec);
+  const roundStart = splits.length ? splits[splits.length - 1] : 0;
+  const roundSec = workSec - roundStart;
+  const isLast = round >= block.rounds;
+
   const roundDone = () => {
-    if (round >= block.rounds) {
+    if (isLast) {
       cues.end();
       onFinish(Math.round(workSec));
-    } else {
-      cues.round(round + 1);
-      setRound(round + 1);
+      return;
     }
+    cues.round(round + 1);
+    setSplits([...splits, workSec]);
+    setFlash({ round, sec: roundSec });
+    setRound(round + 1);
   };
 
   return (
     <View>
-      <Row style={{ justifyContent: 'space-between' }}>
-        <Txt variant="small" color={colors.muted}>
-          {t('run.roundOf', { n: round, total: block.rounds })}
-        </Txt>
-      </Row>
+      {block.rounds > 1 ? <RoundDots total={block.rounds} done={round - 1} /> : null}
       {lead > 0 ? (
         <BigClock seconds={lead} color={colors.warn} label={t('run.getReady')} />
+      ) : flash ? (
+        <View accessibilityRole="alert" style={{ alignItems: 'center', paddingVertical: space.lg, gap: 6 }}>
+          <View style={{ backgroundColor: colors.success, borderRadius: radius.pill, paddingHorizontal: space.lg, paddingVertical: 6 }}>
+            <Txt style={{ fontWeight: '800', fontSize: 18 }} color={colors.accentText}>
+              {t('run.roundComplete', { n: flash.round })}
+            </Txt>
+          </View>
+          <Txt style={{ fontSize: 64, fontWeight: '800', fontVariant: ['tabular-nums'] }} color={colors.success}>
+            {clock(flash.sec)}
+          </Txt>
+          <Txt variant="h2">{t('run.nextRound', { n: round, total: block.rounds })}</Txt>
+        </View>
       ) : (
-        <BigClock seconds={workSec} color={colors.accent} label={t('run.stopwatch')} />
+        <View>
+          {block.rounds > 1 ? (
+            <Txt variant="title" color={colors.accent} style={{ textAlign: 'center', marginTop: space.md }}>
+              {t('run.roundOf', { n: round, total: block.rounds })}
+            </Txt>
+          ) : null}
+          <BigClock
+            seconds={roundSec}
+            color={colors.accent}
+            label={t('run.stopwatch')}
+            sub={splits.length ? `${t('run.total')} ${clock(workSec)}` : undefined}
+          />
+        </View>
       )}
       <ItemLines items={block.items} big={block.items.length <= 3} />
-      <Button label={t('run.roundDone')} size="lg" style={{ marginTop: space.xl }} onPress={roundDone} disabled={lead > 0} />
+      {splits.length ? (
+        <Row style={{ justifyContent: 'center', flexWrap: 'wrap', marginTop: space.md }} gap={space.md}>
+          {splits.map((end, i) => (
+            <Txt key={i} variant="small" color={colors.muted}>
+              {`R${i + 1} ${clock(end - (i ? splits[i - 1] : 0))}`}
+            </Txt>
+          ))}
+        </Row>
+      ) : null}
+      <Button
+        label={block.rounds > 1 ? (isLast ? t('run.lastRoundDone') : t('run.roundDoneOf', { n: round, total: block.rounds })) : t('run.roundDone')}
+        size="lg"
+        style={{ marginTop: space.xl }}
+        onPress={roundDone}
+        disabled={lead > 0}
+      />
       <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={() => onFinish(Math.round(workSec))} />
     </View>
+  );
+}
+
+// One dot per round: done rounds filled with a check, the current one outlined.
+function RoundDots({ total, done }: { total: number; done: number }) {
+  return (
+    <Row style={{ justifyContent: 'center', flexWrap: 'wrap' }} gap={space.sm}>
+      {Array.from({ length: total }, (_, i) => {
+        const isDone = i < done;
+        const current = i === done;
+        return (
+          <View
+            key={i}
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 18,
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderWidth: 2,
+              borderColor: isDone ? colors.success : current ? colors.accent : colors.border,
+              backgroundColor: isDone ? colors.success : 'transparent',
+            }}
+          >
+            <Txt style={{ fontWeight: '800', fontSize: 15 }} color={isDone ? colors.accentText : current ? colors.accent : colors.faint}>
+              {isDone ? '✓' : i + 1}
+            </Txt>
+          </View>
+        );
+      })}
+    </Row>
   );
 }

@@ -374,4 +374,9 @@ export const en: Record<StringKey, string> = {
   'settings.editProfile': 'Edit answers',
   'home.coachReady': 'Your profile is ready. The coach will build your weekly plan from your answers.',
   'home.viewProfile': 'See my answers',
+  'run.roundComplete': '✓ Round {n} done',
+  'run.nextRound': 'Round {n} of {total}, go!',
+  'run.roundDoneOf': 'Finished round {n} of {total}',
+  'run.lastRoundDone': 'Finished the last round',
+  'run.total': 'Total',
 };
