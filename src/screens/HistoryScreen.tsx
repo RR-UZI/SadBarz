@@ -119,6 +119,11 @@ export function WorkoutDetailScreen({ id }: { id: string }) {
                 {clock(b.durationSec)}
               </Txt>
             ) : null}
+            {b.score ? (
+              <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
+                {`AMRAP · ${t('run.score', { rounds: b.score.rounds, reps: b.score.reps })}`}
+              </Txt>
+            ) : null}
             <View style={{ marginTop: space.sm, gap: 2 }}>
               {b.entries.map((e, j) => (
                 <Txt key={j} variant="small">

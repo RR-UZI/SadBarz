@@ -27,6 +27,7 @@ export function TimersScreen() {
   const [tabRounds, setTabRounds] = useState(8);
   const [cdMin, setCdMin] = useState(5);
   const [cdSec, setCdSec] = useState(0);
+  const [amrapMin, setAmrapMin] = useState(10);
 
   const launch = (block: Block, title: string) => {
     unlockAudio();
@@ -79,6 +80,17 @@ export function TimersScreen() {
           label={`▶ ${t('common.start')}`}
           onPress={() => launch({ ...newBlock('tabata'), workSec: work, restSec: rest, rounds: tabRounds }, `Tabata ${shortDuration(work)} x ${shortDuration(rest)}`)}
         />
+      </Card>
+
+      <Card style={{ marginTop: space.md, gap: space.md }}>
+        <View>
+          <Txt variant="h2">{t('timers.amrap')}</Txt>
+          <Txt variant="small" color={colors.muted}>
+            {t('timers.amrapHelp')}
+          </Txt>
+        </View>
+        <NumberField label={t('timers.minutes')} value={amrapMin} min={1} max={120} onChange={(v) => setAmrapMin(v ?? 10)} />
+        <Button label={`▶ ${t('common.start')}`} onPress={() => launch({ ...newBlock('amrap'), capSec: amrapMin * 60 }, `AMRAP ${amrapMin} min`)} />
       </Card>
 
       <Card style={{ marginTop: space.md, gap: space.md }}>

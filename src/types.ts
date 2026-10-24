@@ -39,19 +39,21 @@ export interface SetRow {
 // tabata  = work / rest, X rounds
 // sets    = sets x reps with rest between (pyramids, weighted work)
 // circuit = list of moves for X rounds, stopwatch running
-export type BlockFormat = 'emom' | 'tabata' | 'sets' | 'circuit';
+// amrap   = as many rounds as possible before the time cap runs out
+export type BlockFormat = 'emom' | 'tabata' | 'sets' | 'circuit' | 'amrap';
 
 export interface Block {
   id: string;
   title?: string;
   format: BlockFormat;
-  items: BlockItem[]; // emom, tabata, circuit
+  items: BlockItem[]; // emom, tabata, circuit, amrap
   rows: SetRow[]; // sets
   intervalSec: number; // emom
   rounds: number; // emom, tabata, circuit
   perRound: 'all' | 'rotate'; // emom/tabata: all items every round, or one item per round in turn
   workSec: number; // tabata
   restSec: number; // tabata
+  capSec?: number; // amrap: time cap
   restAfterSec?: number; // the routine's suggested break after this block
   note?: string;
 }
@@ -86,6 +88,13 @@ export interface BlockLog {
   status: BlockStatus;
   durationSec: number;
   entries: LogEntry[];
+  score?: AmrapScore; // amrap
+}
+
+// AMRAP result: full rounds plus the reps done in the unfinished round.
+export interface AmrapScore {
+  rounds: number;
+  reps: number;
 }
 
 export interface Workout {
