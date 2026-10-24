@@ -24,15 +24,15 @@ import { colors } from './src/theme';
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppProvider>
-        <AuthProvider>
+      <AuthProvider>
+        <AppProvider>
           <NavProvider>
             <StatusBar style="light" />
             <Root />
             <ConfirmHost />
           </NavProvider>
-        </AuthProvider>
-      </AppProvider>
+        </AppProvider>
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

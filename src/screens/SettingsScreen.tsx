@@ -14,7 +14,7 @@ import type { Settings } from '../types';
 export function SettingsScreen() {
   const t = useT();
   const nav = useNav();
-  const { settings, updateSettings, reloadExamples } = useApp();
+  const { settings, updateSettings, reloadExamples, sync, syncNow } = useApp();
   const { user, mode, signOut } = useAuth();
   const [reloaded, setReloaded] = useState(false);
   const set = (patch: Partial<Settings>) => updateSettings(patch);
@@ -168,6 +168,14 @@ export function SettingsScreen() {
       </Section>
 
       <Section title={t('settings.data')}>
+        <View style={{ gap: space.sm, marginBottom: space.md }}>
+          <Txt variant="small" color={sync.status === 'error' ? colors.warn : sync.status === 'synced' ? colors.success : colors.muted}>
+            {sync.status === 'synced' && sync.at
+              ? t('settings.sync.synced', { time: new Date(sync.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) })
+              : t(`settings.sync.${sync.status}`)}
+          </Txt>
+          {sync.status !== 'off' ? <Button label={t('settings.sync.now')} variant="ghost" size="sm" onPress={syncNow} disabled={sync.status === 'syncing'} /> : null}
+        </View>
         <Button
           label={t('settings.resetExamples')}
           variant="secondary"

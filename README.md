@@ -46,6 +46,8 @@ Sign up and log in use [Supabase Auth](https://supabase.com/docs/guides/auth), p
 
 The onboarding answers are saved in the account's user metadata under `profile` (see `Profile` in `src/types.ts`), so they follow the user to any device and a server function can read them when it builds the plan. No table is needed for this.
 
+**Routines, workouts, own exercises and settings** are saved per user in the table `public.user_data` (one row per user, a JSON copy of their data). Row level security lets each signed-in user read and write only their own row. Create it once by pasting `supabase/migrations/20261024000000_user_data.sql` into **SQL Editor → New query → Run**. Each device keeps its own copy too (`sadbarz:v1:<user id>`), works offline, and merges with the cloud copy on sign in, when the app comes back to the front, and a moment after every change (`src/lib/sync.ts`). Settings → Datos shows whether the last sync worked.
+
 In Supabase, **Authentication → URL Configuration** must list the site address (the Vercel URL, and `http://localhost:8081` for local work) so confirmation and password reset links come back to the app.
 
 ## Deploy the web app (Vercel)
@@ -57,8 +59,10 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 | Path | What it is |
 | --- | --- |
 | `App.tsx` | Providers, tab bar, screen switching |
+| `src/lib/sync.ts` | Per-user cloud copy: pull, merge, push |
+| `supabase/migrations/` | SQL for the Supabase tables |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
-| `src/store/AppStore.tsx` | App state saved to device storage |
+| `src/store/AppStore.tsx` | App state per user: device copy plus cloud sync |
 | `src/data/seed.ts` | Exercise library and example routines |
 | `src/lib/blocks.ts` | Block helpers and the timer timeline |
 | `src/lib/sound.ts` | Beeps, voice cues, vibration |
