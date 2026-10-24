@@ -203,6 +203,11 @@ export const es = {
   'settings.data': 'Datos',
   'settings.resetExamples': 'Volver a cargar rutinas de ejemplo',
   'settings.resetDone': 'Rutinas de ejemplo cargadas.',
+  'settings.sync.synced': '✓ Guardado en tu cuenta · {time}. Tus rutinas y entrenos se ven en todos tus dispositivos.',
+  'settings.sync.syncing': 'Sincronizando con tu cuenta…',
+  'settings.sync.error': 'No se pudo guardar en la nube. Tus datos siguen en este dispositivo y se vuelve a intentar solo.',
+  'settings.sync.off': 'Modo prueba: los datos se guardan solo en este dispositivo.',
+  'settings.sync.now': 'Sincronizar ahora',
   'settings.about': 'SadBarz · prototipo web v0.1',
 
   'voice.round': 'Ronda {n}',
@@ -257,7 +262,7 @@ export const es = {
 
   'settings.account': 'Cuenta',
   'settings.signOut': 'Cerrar sesión',
-  'settings.signOutConfirm': '¿Cerrar sesión? Tus rutinas y entrenos se quedan en este dispositivo.',
+  'settings.signOutConfirm': '¿Cerrar sesión? Tus rutinas y entrenos quedan guardados en tu cuenta.',
   'home.helloName': '¡A darle, {name}!',
   'onb.step': 'Paso {n} de {total}',
   'onb.continue': 'Continuar',

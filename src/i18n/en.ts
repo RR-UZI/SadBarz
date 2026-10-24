@@ -204,6 +204,11 @@ export const en: Record<StringKey, string> = {
   'settings.data': 'Data',
   'settings.resetExamples': 'Reload example routines',
   'settings.resetDone': 'Example routines loaded.',
+  'settings.sync.synced': '✓ Saved to your account · {time}. Your routines and workouts show on all your devices.',
+  'settings.sync.syncing': 'Syncing with your account…',
+  'settings.sync.error': 'Could not save to the cloud. Your data is still on this device and it will try again on its own.',
+  'settings.sync.off': 'Preview mode: data is saved on this device only.',
+  'settings.sync.now': 'Sync now',
   'settings.about': 'SadBarz · web prototype v0.1',
 
   'voice.round': 'Round {n}',
@@ -258,7 +263,7 @@ export const en: Record<StringKey, string> = {
 
   'settings.account': 'Account',
   'settings.signOut': 'Log out',
-  'settings.signOutConfirm': 'Log out? Your routines and workouts stay on this device.',
+  'settings.signOutConfirm': 'Log out? Your routines and workouts stay saved in your account.',
   'home.helloName': "Let's go, {name}!",
   'onb.step': 'Step {n} of {total}',
   'onb.continue': 'Continue',

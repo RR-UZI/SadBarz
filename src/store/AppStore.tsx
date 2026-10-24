@@ -1,13 +1,23 @@
-// App state: exercises, routines, workouts and settings, saved on the device.
-// On web this is the browser's local storage; on the phone it is the app's storage.
+// App state: exercises, routines, workouts and settings of the signed-in user.
+// Each user has a copy on the device (browser storage on web, app storage on the
+// phone) and, with an account, a copy in the cloud that every device merges with.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, Platform } from 'react-native';
 
 import { SEED_EXERCISES, seedRoutines } from '../data/seed';
 import { setVolume } from '../lib/sound';
+import { mergeSynced, pullRemote, pushRemote, syncEnabled, syncedKey, type Synced } from '../lib/sync';
 import type { Exercise, Routine, Settings, Workout } from '../types';
+import { useAuth } from './Auth';
 
-const STORAGE_KEY = 'sadbarz:v1';
+// Before accounts all data lived under this key; the first user to sign in on the device takes it over.
+const LEGACY_KEY = 'sadbarz:v1';
+const userKey = (userId: string) => `sadbarz:v1:${userId}`;
+// Settings of the last user on this device, so the sign-in screen keeps their language.
+const DEVICE_SETTINGS_KEY = 'sadbarz:device-settings';
+// Wait this long after a change before sending it to the cloud.
+const PUSH_DELAY_MS = 1500;
 // Bumped when a default changes and saved settings should follow it (2: 10 s lead-in).
 const DATA_VERSION = 5;
 
@@ -32,10 +42,17 @@ interface Data {
   routines: Routine[];
   workouts: Workout[];
   settings: Settings;
+  settingsAt: number;
+  deleted: Record<string, number>;
 }
+
+// 'off': no cloud (preview mode). 'error': the last sync failed; data is still saved on the device.
+export type SyncStatus = 'off' | 'syncing' | 'synced' | 'error';
 
 interface AppContextValue extends Data {
   ready: boolean;
+  sync: { status: SyncStatus; at: number | null };
+  syncNow: () => void;
   exerciseById: (id: string) => Exercise | undefined;
   saveRoutine: (r: Routine) => void;
   deleteRoutine: (id: string) => void;
@@ -48,8 +65,8 @@ interface AppContextValue extends Data {
 
 const AppContext = createContext<AppContextValue | null>(null);
 
-function initialData(): Data {
-  return { exercises: SEED_EXERCISES, routines: seedRoutines(), workouts: [], settings: DEFAULT_SETTINGS };
+function initialData(settings: Settings = DEFAULT_SETTINGS): Data {
+  return { exercises: SEED_EXERCISES, routines: seedRoutines(), workouts: [], settings, settingsAt: 0, deleted: {} };
 }
 
 // Swaps the old examples for the current ones. Examples the user edited are kept.
@@ -59,43 +76,171 @@ function withNewExamples(routines: Routine[]) {
   return [...kept.filter((r) => !r.example), ...seeds, ...kept.filter((r) => r.example)];
 }
 
+function fromSaved(saved: Partial<Data> & { version?: number }): Data {
+  const settings = { ...DEFAULT_SETTINGS, ...saved.settings };
+  // v2: the lead-in default went from 3 s to 10 s.
+  if ((saved.version ?? 1) < 2 && settings.leadInSec === 3) settings.leadInSec = 10;
+  // Keep seed exercises up to date, add the user's own on top.
+  const custom = (saved.exercises ?? []).filter((e) => e.custom);
+  return {
+    exercises: [...SEED_EXERCISES, ...custom],
+    // v3: the examples became one routine per weekday, Monday to Friday. v4: new Thursday. v5: its EMOM alternates rounds.
+    routines: saved.routines ? ((saved.version ?? 1) < 5 ? withNewExamples(saved.routines) : saved.routines) : seedRoutines(),
+    workouts: saved.workouts ?? [],
+    settings,
+    settingsAt: saved.settingsAt ?? 0,
+    deleted: saved.deleted ?? {},
+  };
+}
+
+function toSynced(d: Data): Synced {
+  return {
+    routines: d.routines,
+    workouts: d.workouts,
+    exercises: d.exercises.filter((e) => e.custom),
+    settings: d.settings,
+    settingsAt: d.settingsAt,
+    deleted: d.deleted,
+  };
+}
+
+function fromSynced(s: Synced): Data {
+  return { ...s, exercises: [...SEED_EXERCISES, ...s.exercises] };
+}
+
+// This device's copy for a user. The first user to sign in here inherits the data saved before accounts.
+async function readLocal(userId: string): Promise<Data> {
+  try {
+    const own = await AsyncStorage.getItem(userKey(userId));
+    if (own) return fromSaved(JSON.parse(own));
+    const legacy = await AsyncStorage.getItem(LEGACY_KEY);
+    if (legacy) {
+      await AsyncStorage.setItem(userKey(userId), legacy);
+      await AsyncStorage.removeItem(LEGACY_KEY);
+      const data = fromSaved(JSON.parse(legacy));
+      // Settings chosen before accounts beat another device's untouched defaults.
+      return { ...data, settingsAt: Math.max(data.settingsAt, 1) };
+    }
+    const device = await AsyncStorage.getItem(DEVICE_SETTINGS_KEY);
+    return initialData(device ? { ...DEFAULT_SETTINGS, ...JSON.parse(device) } : DEFAULT_SETTINGS);
+  } catch {
+    // storage blocked or broken: start fresh, the app still works
+    return initialData();
+  }
+}
+
 export function AppProvider({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
   const [data, setData] = useState<Data>(initialData);
   const [ready, setReady] = useState(false);
-  const loaded = useRef(false);
+  const [sync, setSync] = useState<{ status: SyncStatus; at: number | null }>({ status: syncEnabled ? 'syncing' : 'off', at: null });
+  // The user whose data is in `data`; null while it loads or when signed out.
+  const owner = useRef<string | null>(null);
+  const dataRef = useRef(data);
+  dataRef.current = data;
+  // What the cloud holds after the last good sync, to skip pushing unchanged data.
+  const cloudKey = useRef('');
+  const running = useRef(false);
+  const rerun = useRef(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (raw) {
-          const saved = JSON.parse(raw) as Partial<Data> & { version?: number };
-          const settings = { ...DEFAULT_SETTINGS, ...saved.settings };
-          // v2: the lead-in default went from 3 s to 10 s.
-          if ((saved.version ?? 1) < 2 && settings.leadInSec === 3) settings.leadInSec = 10;
-          // Keep seed exercises up to date, add the user's own on top.
-          const custom = (saved.exercises ?? []).filter((e) => e.custom);
-          setData({
-            exercises: [...SEED_EXERCISES, ...custom],
-            // v3: the examples became one routine per weekday, Monday to Friday. v4: new Thursday. v5: its EMOM alternates rounds.
-            routines: saved.routines ? ((saved.version ?? 1) < 5 ? withNewExamples(saved.routines) : saved.routines) : seedRoutines(),
-            workouts: saved.workouts ?? [],
-            settings,
-          });
-        }
-      } catch {
-        // storage blocked or broken: start fresh, the app still works
+  // Pull the cloud copy, merge it into this device's, and push the result back.
+  const syncNow = useCallback(async () => {
+    const uid = owner.current;
+    if (!syncEnabled || !uid) return;
+    if (running.current) {
+      rerun.current = true;
+      return;
+    }
+    running.current = true;
+    setSync((s) => ({ ...s, status: 'syncing' }));
+    try {
+      const remote = await pullRemote(uid);
+      if (owner.current !== uid) return;
+      const merged = remote ? mergeSynced(toSynced(dataRef.current), remote) : toSynced(dataRef.current);
+      const key = syncedKey(merged);
+      if (!remote || syncedKey(remote) !== key) await pushRemote(uid, merged);
+      if (owner.current !== uid) return;
+      cloudKey.current = key;
+      // Changes made while this ran are merged on top, and trigger another push.
+      setData((d) => (syncedKey(toSynced(d)) === key ? d : fromSynced(mergeSynced(toSynced(d), merged))));
+      setSync({ status: 'synced', at: Date.now() });
+    } catch {
+      if (owner.current === uid) setSync((s) => ({ ...s, status: 'error' }));
+    } finally {
+      running.current = false;
+      if (rerun.current) {
+        rerun.current = false;
+        syncNow();
       }
-      loaded.current = true;
-      setReady(true);
-    })();
+    }
   }, []);
 
+  // Load the signed-in user's data: this device's copy right away, then the cloud's.
+  useEffect(() => {
+    owner.current = null;
+    cloudKey.current = '';
+    let cancelled = false;
+    setReady(false);
+    (async () => {
+      if (!userId) {
+        let settings = DEFAULT_SETTINGS;
+        try {
+          const device = await AsyncStorage.getItem(DEVICE_SETTINGS_KEY);
+          if (device) settings = { ...DEFAULT_SETTINGS, ...JSON.parse(device) };
+        } catch {
+          // storage blocked: defaults
+        }
+        if (cancelled) return;
+        setData(initialData(settings));
+        setReady(true);
+        return;
+      }
+      const local = await readLocal(userId);
+      if (cancelled) return;
+      dataRef.current = local;
+      setData(local);
+      owner.current = userId;
+      setReady(true);
+      syncNow();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, syncNow]);
+
+  // Save every change on the device, and send it to the cloud shortly after.
   useEffect(() => {
     setVolume(data.settings.volume);
-    if (!loaded.current) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify({ ...data, version: DATA_VERSION })).catch(() => {});
-  }, [data]);
+    const uid = owner.current;
+    if (!uid) return;
+    AsyncStorage.setItem(userKey(uid), JSON.stringify({ ...data, version: DATA_VERSION })).catch(() => {});
+    AsyncStorage.setItem(DEVICE_SETTINGS_KEY, JSON.stringify(data.settings)).catch(() => {});
+    if (!syncEnabled || syncedKey(toSynced(data)) === cloudKey.current) return;
+    const id = setTimeout(syncNow, PUSH_DELAY_MS);
+    return () => clearTimeout(id);
+  }, [data, syncNow]);
+
+  // Coming back to the app (another tab, the phone unlocked) picks up changes from other devices.
+  useEffect(() => {
+    if (!syncEnabled) return;
+    if (Platform.OS === 'web') {
+      if (typeof document === 'undefined') return;
+      const onVisible = () => {
+        if (document.visibilityState === 'visible') syncNow();
+      };
+      document.addEventListener('visibilitychange', onVisible);
+      window.addEventListener('online', onVisible);
+      return () => {
+        document.removeEventListener('visibilitychange', onVisible);
+        window.removeEventListener('online', onVisible);
+      };
+    }
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') syncNow();
+    });
+    return () => sub.remove();
+  }, [syncNow]);
 
   const exerciseById = useCallback((id: string) => data.exercises.find((e) => e.id === id), [data.exercises]);
 
@@ -108,7 +253,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteRoutine = useCallback((id: string) => {
-    setData((d) => ({ ...d, routines: d.routines.filter((r) => r.id !== id) }));
+    setData((d) => ({ ...d, routines: d.routines.filter((r) => r.id !== id), deleted: { ...d.deleted, [id]: Date.now() } }));
   }, []);
 
   const saveWorkout = useCallback((w: Workout) => {
@@ -116,7 +261,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const deleteWorkout = useCallback((id: string) => {
-    setData((d) => ({ ...d, workouts: d.workouts.filter((w) => w.id !== id) }));
+    setData((d) => ({ ...d, workouts: d.workouts.filter((w) => w.id !== id), deleted: { ...d.deleted, [id]: Date.now() } }));
   }, []);
 
   const addExercise = useCallback((e: Exercise) => {
@@ -124,7 +269,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
-    setData((d) => ({ ...d, settings: { ...d.settings, ...patch } }));
+    setData((d) => ({ ...d, settings: { ...d.settings, ...patch }, settingsAt: Date.now() }));
   }, []);
 
   const reloadExamples = useCallback(() => {
@@ -132,13 +277,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const seeds = seedRoutines();
       // Untouched old examples go too; ones the user edited stay unless a current example replaces them.
       const others = d.routines.filter((r) => !seeds.some((s) => s.id === r.id) && !(r.example && r.updatedAt === r.createdAt));
-      return { ...d, routines: [...others, ...seeds] };
+      // examples deleted before (on any device) come back too
+      const deleted = Object.fromEntries(Object.entries(d.deleted).filter(([id]) => !seeds.some((r) => r.id === id)));
+      return { ...d, routines: [...others, ...seeds], deleted };
     });
   }, []);
 
   const value = useMemo<AppContextValue>(
-    () => ({ ...data, ready, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, reloadExamples }),
-    [data, ready, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, reloadExamples],
+    () => ({ ...data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, reloadExamples }),
+    [data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, reloadExamples],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
