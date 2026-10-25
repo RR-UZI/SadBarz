@@ -5,6 +5,7 @@ import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { blockDurationSec, cloneBlock } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
+import { showPro, useRoutineLimit } from '../lib/plan';
 import { clock, uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -16,6 +17,7 @@ export function RoutineDetailScreen({ id }: { id: string }) {
   const nav = useNav();
   const { routines, saveRoutine, deleteRoutine } = useApp();
   const routine = routines.find((r) => r.id === id);
+  const limit = useRoutineLimit();
 
   if (!routine) {
     return (
@@ -28,6 +30,7 @@ export function RoutineDetailScreen({ id }: { id: string }) {
   const timed = routine.blocks.reduce((s, b) => s + blockDurationSec(b), 0);
 
   const duplicate = () => {
+    if (!limit.canAdd) return showPro('routineLimit');
     const now = Date.now();
     const copy = {
       ...routine,

@@ -5,6 +5,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { ConfirmHost } from './src/components/ConfirmHost';
 import { LogoMark } from './src/components/Logo';
+import { ProHost } from './src/components/ProHost';
 import { useT } from './src/i18n';
 import { NavProvider, useNav, type Route, type TabName } from './src/navigation';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -30,6 +31,7 @@ export default function App() {
             <StatusBar style="light" />
             <Root />
             <ConfirmHost />
+            <ProHost />
           </NavProvider>
         </AppProvider>
       </AuthProvider>

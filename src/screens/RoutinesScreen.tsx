@@ -1,9 +1,10 @@
 import React from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { blockDurationSec, formatLabel, itemTarget, itemTurns } from '../lib/blocks';
+import { showPro, useRoutineLimit } from '../lib/plan';
 import { clock } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -14,10 +15,21 @@ export function RoutinesScreen() {
   const t = useT();
   const { routines } = useApp();
   const nav = useNav();
+  const limit = useRoutineLimit();
+  // Free accounts at their limit get the Pro pop-up instead of a new routine.
+  const newRoutine = () => (limit.canAdd ? nav.push({ name: 'editRoutine' }) : showPro('routineLimit'));
 
   return (
-    <Screen title={t('routines.title')} mark right={<Button label="+" size="sm" onPress={() => nav.push({ name: 'editRoutine' })} />}>
-      <Button label={t('routines.new')} variant="secondary" onPress={() => nav.push({ name: 'editRoutine' })} />
+    <Screen title={t('routines.title')} mark right={<Button label="+" size="sm" onPress={newRoutine} />}>
+      <Button label={t('routines.new')} variant="secondary" onPress={newRoutine} />
+      {!limit.isPro ? (
+        <Pressable accessibilityRole="button" onPress={() => showPro('info')} style={{ marginTop: space.sm }}>
+          <Txt variant="small" color={limit.canAdd ? colors.muted : colors.warn} style={{ textAlign: 'center' }}>
+            {t('routines.limitCount', { used: limit.used, limit: limit.limit })}
+            <Txt variant="small" color={colors.accent} style={{ fontWeight: '700' }}>{`  ·  ${t('settings.seePro')}`}</Txt>
+          </Txt>
+        </Pressable>
+      ) : null}
       <View style={{ gap: space.md, marginTop: space.lg }}>
         {routines.length === 0 ? <Txt color={colors.muted}>{t('routines.empty')}</Txt> : null}
         {routines.map((r) => (

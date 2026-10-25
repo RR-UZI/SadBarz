@@ -5,6 +5,7 @@ import { BlockEditor } from '../components/BlockEditor';
 import { Button, Card, Field, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { newBlock } from '../lib/blocks';
+import { showPro, useRoutineLimit } from '../lib/plan';
 import { uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -28,6 +29,7 @@ export function RoutineEditorScreen({ id }: { id?: string }) {
         updatedAt: Date.now(),
       },
   );
+  const limit = useRoutineLimit();
   const [openId, setOpenId] = useState<string | null>(existing ? null : draft.blocks[0]?.id ?? null);
 
   const setBlock = (b: Block) => setDraft((d) => ({ ...d, blocks: d.blocks.map((x) => (x.id === b.id ? b : x)) }));
@@ -41,6 +43,8 @@ export function RoutineEditorScreen({ id }: { id?: string }) {
     });
 
   const save = () => {
+    // A new routine past the free limit (e.g. one added on another device meanwhile) isn't saved.
+    if (!existing && !limit.canAdd) return showPro('routineLimit');
     saveRoutine({ ...draft, name: draft.name.trim() || t('routines.untitled') });
     if (existing) nav.pop();
     else nav.replace({ name: 'routine', id: draft.id });
