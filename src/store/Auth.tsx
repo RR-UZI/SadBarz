@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
+import type { Plan } from '../lib/plan';
 import { asProfile } from '../lib/profile';
 import { supabase } from '../lib/supabase';
 import type { Profile } from '../types';
@@ -14,6 +15,7 @@ export interface Account {
   name: string;
   /** Onboarding answers; null until onboarding is finished. */
   profile: Profile | null;
+  plan: Plan;
 }
 
 // Each maps to an 'auth.error.*' string.
@@ -53,6 +55,8 @@ interface AuthValue {
   setNewPassword: (password: string) => Promise<AuthResult>;
   /** Saves the onboarding answers to the account. */
   saveProfile: (profile: Profile) => Promise<AuthResult>;
+  /** Notes on the account that the user asked for Pro (before payments exist), so they can be told when it opens. */
+  markProInterest: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -61,7 +65,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 const PREVIEW_ACCOUNTS = 'sadbarz:preview-accounts';
 const PREVIEW_SESSION = 'sadbarz:preview-session';
 
-type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile }>;
+type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile; plan?: Plan }>;
 
 export function validEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
@@ -82,13 +86,13 @@ function redirectUrl() {
   return Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.origin + window.location.pathname : undefined;
 }
 
-function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Record<string, unknown> }): Account {
+function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Record<string, unknown>; app_metadata?: Record<string, unknown> }): Account {
   const email = u.email ?? '';
   const meta = u.user_metadata ?? {};
   // Email sign up stores `name`; Google fills `full_name` and `name`.
   const fromMeta = [meta.name, meta.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
   const name = fromMeta ?? email.split('@')[0];
-  return { id: u.id, email, name, profile: asProfile(meta.profile) };
+  return { id: u.id, email, name, profile: asProfile(meta.profile), plan: u.app_metadata?.plan === 'pro' ? 'pro' : 'free' };
 }
 
 function mapError(e: { code?: string; message?: string; status?: number } | null | undefined): AuthError {
@@ -105,7 +109,7 @@ function mapError(e: { code?: string; message?: string; status?: number } | null
 }
 
 function previewUser(email: string, acc: PreviewAccounts[string]): Account {
-  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile) };
+  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile), plan: acc.plan === 'pro' ? 'pro' : 'free' };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -203,7 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accounts[email] = { id, name, hash: hashPassword(email, password) };
     await AsyncStorage.setItem(PREVIEW_ACCOUNTS, JSON.stringify(accounts));
     await AsyncStorage.setItem(PREVIEW_SESSION, email);
-    setUser({ id, email, name, profile: null });
+    setUser({ id, email, name, profile: null, plan: 'free' });
     return { ok: true, value: false };
   }, []);
 
@@ -277,6 +281,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     [user],
   );
 
+  const markProInterest = useCallback(async (): Promise<AuthResult> => {
+    if (!supabase) return { ok: true, value: undefined };
+    try {
+      const { data, error } = await supabase.auth.updateUser({ data: { pro_interest_at: new Date().toISOString() } });
+      if (error) return { ok: false, error: mapError(error) };
+      setUser(fromSupabaseUser(data.user));
+      return { ok: true, value: undefined };
+    } catch {
+      return { ok: false, error: 'network' };
+    }
+  }, []);
+
   const signOut = useCallback(async () => {
     if (supabase) {
       await supabase.auth.signOut().catch(() => {});
@@ -288,8 +304,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, signOut }),
-    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, signOut],
+    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, signOut }),
+    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

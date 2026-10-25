@@ -4,6 +4,7 @@ import { View } from 'react-native';
 import { Button, Card, Divider, Row, Screen, Section, Segmented, ToggleRow, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { confirm } from '../lib/confirm';
+import { FREE_ROUTINE_LIMIT, showPro } from '../lib/plan';
 import { sounds, unlockAudio } from '../lib/sound';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -49,6 +50,15 @@ export function SettingsScreen() {
             )
           }
         />
+      </Section>
+
+      <Section title={t('settings.plan')}>
+        <Card>
+          <Txt style={{ fontWeight: '800', fontSize: 17 }} color={user?.plan === 'pro' ? colors.accent : colors.text}>
+            {user?.plan === 'pro' ? t('settings.planPro') : t('settings.planFree', { n: FREE_ROUTINE_LIMIT })}
+          </Txt>
+        </Card>
+        {user?.plan !== 'pro' ? <Button label={t('settings.seePro')} onPress={() => showPro('info')} /> : null}
       </Section>
 
       <Section title={t('settings.profile')}>

@@ -400,6 +400,22 @@ export const es = {
   'run.roundDoneOf': 'Terminé la ronda {n} de {total}',
   'run.lastRoundDone': 'Terminé la última ronda',
   'run.total': 'Total',
+  'pro.title': 'Entrena sin límites con Pro',
+  'pro.body': 'Todo lo del plan gratis y además:',
+  'pro.limitTitle': 'Ya tienes tus {n} rutinas',
+  'pro.limitBody': 'El plan gratis guarda hasta {n} rutinas propias (las de ejemplo no cuentan). Borra una o pásate a Pro para tener todas las que quieras.',
+  'pro.perk.routines': 'Rutinas ilimitadas',
+  'pro.perk.coach': 'Coach IA: tu plan semanal y mensual según tus respuestas',
+  'pro.perk.history': 'Historial completo, récords y gráficas',
+  'pro.price': 'USD 10 al mes · 14 días gratis',
+  'pro.cta': 'Quiero Pro',
+  'pro.thanks': '¡Listo! Pro abre muy pronto y te avisamos a tu correo.',
+  'pro.notNow': 'Ahora no',
+  'routines.limitCount': '{used} de {limit} rutinas del plan gratis',
+  'settings.plan': 'Plan',
+  'settings.planFree': 'Gratis · hasta {n} rutinas propias',
+  'settings.planPro': 'Pro',
+  'settings.seePro': 'Ver Pro',
 };
 
 export type StringKey = keyof typeof es;

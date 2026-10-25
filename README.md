@@ -48,6 +48,12 @@ The onboarding answers are saved in the account's user metadata under `profile` 
 
 **Routines, workouts, own exercises and settings** are saved per user in the table `public.user_data` (one row per user, a JSON copy of their data). Row level security lets each signed-in user read and write only their own row. Create it once by pasting `supabase/migrations/20261024000000_user_data.sql` into **SQL Editor → New query → Run**. Each device keeps its own copy too (`sadbarz:v1:<user id>`), works offline, and merges with the cloud copy on sign in, when the app comes back to the front, and a moment after every change (`src/lib/sync.ts`). Settings → Datos shows whether the last sync worked.
 
+**Free vs Pro.** Free accounts keep up to 5 of their own routines (`FREE_ROUTINE_LIMIT` in `src/lib/plan.ts`; the example routines don't count). Creating or duplicating a 6th opens the Pro pop-up instead (`src/components/ProHost.tsx`), whose "Quiero Pro" button stores `pro_interest_at` in the user's metadata until payments exist. An account is Pro when its **app_metadata** has `"plan": "pro"`. Only the server can set that, so users can't upgrade themselves. To make an account Pro by hand, run this in the SQL Editor (the user signs out and in again to see it):
+
+```sql
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"plan":"pro"}'::jsonb where email = 'their@email.com';
+```
+
 In Supabase, **Authentication → URL Configuration** must list the site address (the Vercel URL, and `http://localhost:8081` for local work) so confirmation and password reset links come back to the app.
 
 ## Deploy the web app (Vercel)
@@ -59,6 +65,7 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 | Path | What it is |
 | --- | --- |
 | `App.tsx` | Providers, tab bar, screen switching |
+| `src/lib/plan.ts`, `src/components/ProHost.tsx` | Free plan limits and the Pro pop-up |
 | `src/lib/sync.ts` | Per-user cloud copy: pull, merge, push |
 | `supabase/migrations/` | SQL for the Supabase tables |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
