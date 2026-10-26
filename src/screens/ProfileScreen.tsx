@@ -76,6 +76,9 @@ export function ProfileScreen() {
           <Button label={avatar ? t('profile.changePhoto') : t('profile.addPhoto')} size="sm" variant="secondary" onPress={changePhoto} />
           {avatar ? <Button label={t('profile.removePhoto')} size="sm" variant="ghost" onPress={() => setAvatar(null)} /> : null}
         </Row>
+        <Txt variant="tiny" color={colors.muted} style={{ textAlign: 'center', maxWidth: 300 }}>
+          {t('profile.photoRule')}
+        </Txt>
         {photoError ? (
           <Txt variant="small" color={colors.danger}>
             {t('profile.photoError')}

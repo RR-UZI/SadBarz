@@ -465,6 +465,17 @@ export const es = {
   'record.notePlaceholder': 'Ej. Competencia, test del mes, estrictas',
   'record.needName': 'Ponle nombre al récord.',
   'record.needValue': 'Agrega la marca.',
+  'legal.terms': 'Términos de uso',
+  'legal.privacy': 'Aviso de privacidad',
+  'legal.title': 'Antes de empezar',
+  'legal.intro': 'Lee y acepta cómo funciona SadBarz.',
+  'legal.point.health': 'SadBarz da rutinas y recomendaciones, no consejo médico. Entrenas bajo tu propio riesgo.',
+  'legal.point.content': 'Eres responsable de lo que subes, como tu foto de perfil: debe ser tuya o tener derecho a usarla.',
+  'legal.point.data': 'Usamos tus datos, incluidas lesiones o dolores que nos cuentes, solo para tu entrenamiento. No vendemos tus datos.',
+  'legal.accept': 'Tengo 18 años o más, acepto los Términos de uso y el Aviso de privacidad, y doy mi consentimiento para que SadBarz use mis datos de salud (lesiones o dolores) para adaptar mi entrenamiento.',
+  'legal.continue': 'Aceptar y continuar',
+  'settings.legal': 'Legal',
+  'profile.photoRule': 'Sube solo fotos tuyas o que tengas derecho a usar. Tú eres responsable de lo que subes.',
 };
 
 export type StringKey = keyof typeof es;

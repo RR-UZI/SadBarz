@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { Platform } from 'react-native';
 
+import { TERMS_VERSION } from '../legal/texts';
 import type { Plan } from '../lib/plan';
 import { asProfile } from '../lib/profile';
 import { supabase } from '../lib/supabase';
@@ -16,6 +17,8 @@ export interface Account {
   /** Onboarding answers; null until onboarding is finished. */
   profile: Profile | null;
   plan: Plan;
+  /** The terms version this account accepted; 0 = none yet. */
+  termsVersion: number;
 }
 
 // Each maps to an 'auth.error.*' string.
@@ -57,6 +60,8 @@ interface AuthValue {
   saveProfile: (profile: Profile) => Promise<AuthResult>;
   /** Notes on the account that the user asked for Pro (before payments exist), so they can be told when it opens. */
   markProInterest: () => Promise<AuthResult>;
+  /** Records that the user accepted the current terms, privacy notice and use of health data. */
+  acceptTerms: () => Promise<AuthResult>;
   signOut: () => Promise<void>;
 }
 
@@ -65,7 +70,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 const PREVIEW_ACCOUNTS = 'sadbarz:preview-accounts';
 const PREVIEW_SESSION = 'sadbarz:preview-session';
 
-type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile; plan?: Plan }>;
+type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile; plan?: Plan; termsVersion?: number }>;
 
 export function validEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
@@ -92,7 +97,15 @@ function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Recor
   // Email sign up stores `name`; Google fills `full_name` and `name`.
   const fromMeta = [meta.name, meta.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
   const name = fromMeta ?? email.split('@')[0];
-  return { id: u.id, email, name, profile: asProfile(meta.profile), plan: u.app_metadata?.plan === 'pro' ? 'pro' : 'free' };
+  const terms = meta.terms as { version?: unknown } | undefined;
+  return {
+    id: u.id,
+    email,
+    name,
+    profile: asProfile(meta.profile),
+    plan: u.app_metadata?.plan === 'pro' ? 'pro' : 'free',
+    termsVersion: typeof terms?.version === 'number' ? terms.version : 0,
+  };
 }
 
 function mapError(e: { code?: string; message?: string; status?: number } | null | undefined): AuthError {
@@ -109,7 +122,7 @@ function mapError(e: { code?: string; message?: string; status?: number } | null
 }
 
 function previewUser(email: string, acc: PreviewAccounts[string]): Account {
-  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile), plan: acc.plan === 'pro' ? 'pro' : 'free' };
+  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile), plan: acc.plan === 'pro' ? 'pro' : 'free', termsVersion: acc.termsVersion ?? 0 };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -207,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accounts[email] = { id, name, hash: hashPassword(email, password) };
     await AsyncStorage.setItem(PREVIEW_ACCOUNTS, JSON.stringify(accounts));
     await AsyncStorage.setItem(PREVIEW_SESSION, email);
-    setUser({ id, email, name, profile: null, plan: 'free' });
+    setUser({ id, email, name, profile: null, plan: 'free', termsVersion: 0 });
     return { ok: true, value: false };
   }, []);
 
@@ -293,6 +306,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const acceptTerms = useCallback(async (): Promise<AuthResult> => {
+    if (!user) return { ok: false, error: 'unknown' };
+    // Kept on the account as the record of what was accepted and when.
+    const terms = { version: TERMS_VERSION, accepted_at: new Date().toISOString(), health_data: true };
+    if (supabase) {
+      try {
+        const { data, error } = await supabase.auth.updateUser({ data: { terms } });
+        if (error) return { ok: false, error: mapError(error) };
+        setUser(fromSupabaseUser(data.user));
+        return { ok: true, value: undefined };
+      } catch {
+        return { ok: false, error: 'network' };
+      }
+    }
+    try {
+      const accounts: PreviewAccounts = JSON.parse((await AsyncStorage.getItem(PREVIEW_ACCOUNTS)) ?? '{}');
+      if (accounts[user.email]) {
+        accounts[user.email].termsVersion = TERMS_VERSION;
+        await AsyncStorage.setItem(PREVIEW_ACCOUNTS, JSON.stringify(accounts));
+      }
+    } catch {
+      // storage blocked: keep it for this visit only
+    }
+    setUser({ ...user, termsVersion: TERMS_VERSION });
+    return { ok: true, value: undefined };
+  }, [user]);
+
   const signOut = useCallback(async () => {
     if (supabase) {
       await supabase.auth.signOut().catch(() => {});
@@ -304,8 +344,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, signOut }),
-    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, signOut],
+    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, acceptTerms, signOut }),
+    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, acceptTerms, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
