@@ -1,10 +1,9 @@
 // Athlete profile, for every plan: photo, stats, personal records (PRs) and the
 // best marks found in the workout log.
-import React, { useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, View } from 'react-native';
+import React, { useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
-import { ExercisePicker } from '../components/ExercisePicker';
 import { Badge, Button, Card, Field, NumberField, Row, Screen, Section, Segmented, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { pickAvatar } from '../lib/avatar';
@@ -15,7 +14,7 @@ import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, radius, space } from '../theme';
-import type { PersonalRecord, RecordUnit } from '../types';
+import type { Exercise, PersonalRecord, RecordUnit } from '../types';
 
 // Logged bests shown before "see all".
 const SHOW_FIRST = 6;
@@ -216,18 +215,21 @@ function Stat({ value, label, accent }: { value: number; label: string; accent?:
 }
 
 const UNITS: RecordUnit[] = ['reps', 'sec', 'kg', 'time'];
+// "Pistol" matches "pistol squat"; accents don't matter ("fondos" = "fóndos").
+const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(`${s}T12:00:00`).getTime());
 
 // Add or edit one PR. `draft` pre-fills a new one, e.g. from a logged best.
 export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial<PersonalRecord> }) {
   const t = useT();
   const nav = useNav();
-  const { records, saveRecord, deleteRecord } = useApp();
+  const { records, saveRecord, deleteRecord, exercises } = useApp();
   const existing = id ? records.find((r) => r.id === id) : undefined;
   const [rec, setRec] = useState<PersonalRecord>(
     () => existing ?? { id: uid('pr'), name: '', unit: 'reps', value: 0, date: isoDay(Date.now()), updatedAt: 0, ...draft },
   );
-  const [picking, setPicking] = useState(false);
+  const [searching, setSearching] = useState(false);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [error, setError] = useState<string | null>(null);
   const set = (patch: Partial<PersonalRecord>) => {
     setError(null);
@@ -245,6 +247,21 @@ export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial
       date: isDay(rec.date) ? rec.date : isoDay(Date.now()),
     });
     nav.pop();
+  };
+
+  // Exercises for the list under the name box: names that start with the text first.
+  const matches = useMemo(() => {
+    const q = fold(rec.name);
+    if (!q) return exercises;
+    const hits = exercises.filter((e) => fold(e.name).includes(q));
+    return [...hits.filter((e) => fold(e.name).startsWith(q)), ...hits.filter((e) => !fold(e.name).startsWith(q))];
+  }, [exercises, rec.name]);
+  const showList = searching && !rec.exerciseId && matches.length > 0;
+
+  const pick = (e: Exercise) => {
+    const unit: RecordUnit = e.kind === 'hold' ? 'sec' : rec.unit === 'time' || (rec.unit === 'sec' && e.kind === 'reps') ? 'reps' : rec.unit;
+    set({ name: e.name, exerciseId: e.id, unit });
+    setSearching(false);
   };
 
   const minutes = Math.floor(rec.value / 60);
@@ -271,9 +288,56 @@ export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial
             label={t('record.name')}
             value={rec.name}
             placeholder={t('record.namePlaceholder')}
-            onChangeText={(name) => set({ name, exerciseId: undefined })}
+            onChangeText={(name) => {
+              set({ name, exerciseId: undefined });
+              setSearching(true);
+            }}
+            inputProps={{
+              autoCorrect: false,
+              onFocus: () => {
+                if (blurTimer.current) clearTimeout(blurTimer.current);
+                setSearching(true);
+              },
+              // Wait a moment so a tap on the list still lands.
+              onBlur: () => {
+                blurTimer.current = setTimeout(() => setSearching(false), 200);
+              },
+            }}
           />
-          <Button label={t('record.pick')} size="sm" variant="ghost" onPress={() => setPicking(true)} />
+          {showList ? (
+            <View style={{ maxHeight: 264, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' }}>
+              <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
+                {matches.map((e, i) => (
+                  <Pressable
+                    key={e.id}
+                    onPress={() => pick(e)}
+                    accessibilityRole="button"
+                    style={({ pressed }) => ({
+                      paddingVertical: 11,
+                      paddingHorizontal: space.md,
+                      borderTopWidth: i ? 1 : 0,
+                      borderTopColor: colors.border,
+                      backgroundColor: pressed ? colors.surface2 : 'transparent',
+                    })}
+                  >
+                    <Row style={{ justifyContent: 'space-between' }}>
+                      <Txt style={{ flex: 1 }} numberOfLines={1}>
+                        {e.name}
+                      </Txt>
+                      <Txt variant="tiny" color={colors.muted}>
+                        {t(`record.unit.${e.kind === 'hold' ? 'sec' : 'reps'}`)}
+                      </Txt>
+                    </Row>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </View>
+          ) : null}
+          {searching && rec.name.trim() && !rec.exerciseId && !matches.length ? (
+            <Txt variant="tiny" color={colors.muted}>
+              {t('record.customName')}
+            </Txt>
+          ) : null}
         </View>
 
         <View style={{ gap: space.sm }}>
@@ -337,16 +401,6 @@ export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial
           />
         ) : null}
       </View>
-
-      <ExercisePicker
-        visible={picking}
-        onClose={() => setPicking(false)}
-        onPick={(e) => {
-          setPicking(false);
-          const unit: RecordUnit = e.kind === 'hold' ? 'sec' : rec.unit === 'time' || (rec.unit === 'sec' && e.kind === 'reps') ? 'reps' : rec.unit;
-          set({ name: e.name, exerciseId: e.id, unit });
-        }}
-      />
     </Screen>
   );
 }
