@@ -1,7 +1,7 @@
 // Helpers for the training profile collected in onboarding.
 import type { Level, MaxReps, Profile } from '../types';
 
-export const MIN_AGE = 13;
+export const MIN_AGE = 18; // the terms of use require 18 or older
 export const MAX_AGE = 90;
 export const MIN_WEIGHT_KG = 30;
 export const MAX_WEIGHT_KG = 250;
