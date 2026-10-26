@@ -76,6 +76,9 @@ function circuit(title: string, rounds: number, items: BlockItem[], restAfterSec
 }
 
 /** The example week, Monday to Friday. Home lists these first, in this order. */
+// Calisthenics competitions offered as PR names (their record is the finish time).
+export const COMPETITIONS = ['Desert Battles', 'Califest', 'Barranca Day', 'Street Battles Guadalajara'];
+
 export const WEEK_ROUTINE_IDS = [
   'rt_seed_lunes_emom50',
   'rt_seed_martes_em2m',

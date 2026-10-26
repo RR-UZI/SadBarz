@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
 import { Badge, Button, Card, Field, NumberField, Row, Screen, Section, Segmented, Txt } from '../components/ui';
+import { COMPETITIONS } from '../data/seed';
 import { useT } from '../i18n';
 import { pickAvatar } from '../lib/avatar';
 import { confirm } from '../lib/confirm';
@@ -216,6 +217,8 @@ function Stat({ value, label, accent }: { value: number; label: string; accent?:
 
 const UNITS: RecordUnit[] = ['reps', 'sec', 'kg', 'time'];
 // "Pistol" matches "pistol squat"; accents don't matter ("fondos" = "fóndos").
+// A row of the list under the name box: a competition, or an exercise.
+type Option = { key: string; name: string; exercise?: Exercise };
 const fold = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 const isDay = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(new Date(`${s}T12:00:00`).getTime());
 
@@ -249,18 +252,22 @@ export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial
     nav.pop();
   };
 
-  // Exercises for the list under the name box: names that start with the text first.
+  // The list under the name box: competitions, then exercises; names that start with the text first.
   const matches = useMemo(() => {
+    const all: Option[] = [...COMPETITIONS.map((name) => ({ key: `comp:${name}`, name })), ...exercises.map((e) => ({ key: e.id, name: e.name, exercise: e }))];
     const q = fold(rec.name);
-    if (!q) return exercises;
-    const hits = exercises.filter((e) => fold(e.name).includes(q));
-    return [...hits.filter((e) => fold(e.name).startsWith(q)), ...hits.filter((e) => !fold(e.name).startsWith(q))];
+    if (!q) return all;
+    const hits = all.filter((o) => fold(o.name).includes(q));
+    return [...hits.filter((o) => fold(o.name).startsWith(q)), ...hits.filter((o) => !fold(o.name).startsWith(q))];
   }, [exercises, rec.name]);
   const showList = searching && !rec.exerciseId && matches.length > 0;
 
-  const pick = (e: Exercise) => {
-    const unit: RecordUnit = e.kind === 'hold' ? 'sec' : rec.unit === 'time' || (rec.unit === 'sec' && e.kind === 'reps') ? 'reps' : rec.unit;
-    set({ name: e.name, exerciseId: e.id, unit });
+  const pick = ({ name, exercise: e }: Option) => {
+    if (!e) set({ name, unit: 'time' });
+    else {
+      const unit: RecordUnit = e.kind === 'hold' ? 'sec' : rec.unit === 'time' || (rec.unit === 'sec' && e.kind === 'reps') ? 'reps' : rec.unit;
+      set({ name, exerciseId: e.id, unit });
+    }
     setSearching(false);
   };
 
@@ -307,10 +314,10 @@ export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial
           {showList ? (
             <View style={{ maxHeight: 264, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, overflow: 'hidden' }}>
               <ScrollView keyboardShouldPersistTaps="handled" nestedScrollEnabled>
-                {matches.map((e, i) => (
+                {matches.map((o, i) => (
                   <Pressable
-                    key={e.id}
-                    onPress={() => pick(e)}
+                    key={o.key}
+                    onPress={() => pick(o)}
                     accessibilityRole="button"
                     style={({ pressed }) => ({
                       paddingVertical: 11,
@@ -322,11 +329,17 @@ export function RecordEditorScreen({ id, draft }: { id?: string; draft?: Partial
                   >
                     <Row style={{ justifyContent: 'space-between' }}>
                       <Txt style={{ flex: 1 }} numberOfLines={1}>
-                        {e.name}
+                        {o.name}
                       </Txt>
-                      <Txt variant="tiny" color={colors.muted}>
-                        {t(`record.unit.${e.kind === 'hold' ? 'sec' : 'reps'}`)}
-                      </Txt>
+                      {o.exercise ? (
+                        <Txt variant="tiny" color={colors.muted}>
+                          {t(`record.unit.${o.exercise.kind === 'hold' ? 'sec' : 'reps'}`)}
+                        </Txt>
+                      ) : (
+                        <Txt variant="tiny" color={colors.accent}>
+                          {t('record.competition')}
+                        </Txt>
+                      )}
                     </Row>
                   </Pressable>
                 ))}
