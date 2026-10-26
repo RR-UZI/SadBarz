@@ -1,14 +1,15 @@
 // Shown once after sign in (and again when TERMS_VERSION goes up): the athlete
-// accepts the terms, the privacy notice and the use of their health data.
+// accepts the terms, the privacy notice and the use of their health data. For
+// athletes 13 to 17 a parent or guardian accepts for them.
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { LegalLinks, LegalModal } from '../components/LegalModal';
 import { LogoMark } from '../components/Logo';
-import { Button, Screen, Txt } from '../components/ui';
+import { Button, Field, Screen, Segmented, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import type { LegalDoc } from '../legal/texts';
-import { useAuth, type AuthError } from '../store/Auth';
+import { useAuth, validEmail, type AuthError } from '../store/Auth';
 import { colors, radius, space } from '../theme';
 
 export function TermsScreen() {
@@ -18,11 +19,16 @@ export function TermsScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AuthError | null>(null);
   const [open, setOpen] = useState<LegalDoc | null>(null);
+  const [minor, setMinor] = useState(false);
+  const [guardianName, setGuardianName] = useState('');
+  const [guardianEmail, setGuardianEmail] = useState('');
+  const guardianOk = guardianName.trim().length > 1 && validEmail(guardianEmail);
+  const canAccept = checked && (!minor || guardianOk);
 
   const accept = async () => {
     setBusy(true);
     setError(null);
-    const res = await acceptTerms();
+    const res = await acceptTerms(minor ? { name: guardianName.trim(), email: guardianEmail.trim().toLowerCase() } : undefined);
     setBusy(false);
     if (!res.ok) setError(res.error);
   };
@@ -36,7 +42,7 @@ export function TermsScreen() {
               {t(`auth.error.${error}`)}
             </Txt>
           ) : null}
-          <Button label={t('legal.continue')} size="lg" disabled={!checked || busy} onPress={accept} />
+          <Button label={t('legal.continue')} size="lg" disabled={!canAccept || busy} onPress={accept} />
           <Button label={t('settings.signOut')} variant="ghost" size="sm" onPress={() => void signOut()} />
         </View>
       }
@@ -61,6 +67,37 @@ export function TermsScreen() {
 
       <View style={{ marginTop: space.lg }}>
         <LegalLinks onOpen={setOpen} />
+      </View>
+
+      <View style={{ gap: space.sm, marginTop: space.xl }}>
+        <Txt variant="small" color={colors.muted}>
+          {t('legal.ageGroup')}
+        </Txt>
+        <Segmented
+          value={minor ? 'minor' : 'adult'}
+          onChange={(v) => {
+            setMinor(v === 'minor');
+            setChecked(false);
+          }}
+          options={[
+            { value: 'adult', label: t('legal.adult') },
+            { value: 'minor', label: t('legal.minor') },
+          ]}
+        />
+        <Txt variant="tiny" color={colors.muted}>
+          {minor ? t('legal.minorHelp') : t('legal.under13')}
+        </Txt>
+        {minor ? (
+          <View style={{ gap: space.md, marginTop: space.sm }}>
+            <Field label={t('legal.guardianName')} value={guardianName} onChangeText={setGuardianName} inputProps={{ autoComplete: 'off' }} />
+            <Field
+              label={t('legal.guardianEmail')}
+              value={guardianEmail}
+              onChangeText={setGuardianEmail}
+              inputProps={{ autoCapitalize: 'none', keyboardType: 'email-address', inputMode: 'email', autoComplete: 'off' }}
+            />
+          </View>
+        ) : null}
       </View>
 
       <Pressable
@@ -93,7 +130,7 @@ export function TermsScreen() {
         >
           {checked ? <Txt style={{ color: colors.accentText, fontWeight: '900', lineHeight: 18 }}>✓</Txt> : null}
         </View>
-        <Txt style={{ flex: 1, lineHeight: 22 }}>{t('legal.accept')}</Txt>
+        <Txt style={{ flex: 1, lineHeight: 22 }}>{t(minor ? 'legal.acceptGuardian' : 'legal.accept')}</Txt>
       </Pressable>
 
       <LegalModal doc={open} onClose={() => setOpen(null)} />

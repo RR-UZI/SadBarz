@@ -476,6 +476,17 @@ export const es = {
   'legal.continue': 'Aceptar y continuar',
   'settings.legal': 'Legal',
   'profile.photoRule': 'Sube solo fotos tuyas o que tengas derecho a usar. Tú eres responsable de lo que subes.',
+  'legal.ageGroup': '¿Qué edad tiene el atleta?',
+  'legal.adult': '18 o más',
+  'legal.minor': '13 a 17',
+  'legal.under13': 'SadBarz no es para menores de 13 años.',
+  'legal.minorHelp': 'Para menores de 18, su madre, padre o tutor debe aceptar por ellos. Pásale el teléfono.',
+  'legal.guardianName': 'Nombre de la madre, padre o tutor',
+  'legal.guardianEmail': 'Correo de la madre, padre o tutor',
+  'legal.acceptGuardian': 'Soy la madre, padre o tutor de este atleta de 13 a 17 años. Acepto en su nombre los Términos de uso y el Aviso de privacidad, me hago responsable de lo que suba, y doy mi consentimiento para que SadBarz use sus datos de salud (lesiones o dolores) para adaptar su entrenamiento.',
+  'onb.body.ageMinor': 'Al aceptar los términos indicaste que tienes de 13 a 17 años.',
+  'onb.body.ageAdult': 'Al aceptar los términos indicaste que tienes 18 o más. Si eres menor, tu madre, padre o tutor tiene que aceptarlos.',
+  'onb.body.ageFix': 'Cambiar mi grupo de edad',
 };
 
 export type StringKey = keyof typeof es;

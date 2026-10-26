@@ -28,7 +28,7 @@ const termsMx = `*Versión ${TERMS_VERSION} · última actualización: ${L.updat
 
 **2. Aceptación.** Al crear una cuenta o usar SadBarz aceptas estos Términos y el Aviso de privacidad. Si no estás de acuerdo, no uses la app.
 
-**3. Edad.** Debes tener 18 años o más para crear una cuenta.
+**3. Edad.** SadBarz es para personas de 13 años o más. Si tienes de 13 a 17 años, tu madre, padre o tutor debe aceptar estos Términos y el Aviso de privacidad en tu nombre, y es responsable de tu uso de la app y de lo que subas. No se permiten cuentas de menores de 13 años.
 
 **4. Tu cuenta.** Eres responsable de la información que das, de mantener segura tu contraseña y de todo lo que pase en tu cuenta.
 
@@ -74,6 +74,8 @@ const privacyMx = `*Versión ${TERMS_VERSION} · última actualización: ${L.upd
 
 **Datos sensibles.** Las lesiones, dolores y condiciones de salud que nos indiques son datos personales sensibles. Solo los tratamos con tu consentimiento expreso, que das al marcar la casilla al entrar por primera vez, y solo para adaptar tu entrenamiento.
 
+**Menores de edad.** Los atletas de 13 a 17 años solo pueden usar SadBarz con el consentimiento de su madre, padre o tutor, quien lo da al entrar por primera vez; guardamos su nombre y correo como registro. El tutor puede ejercer los derechos ARCO del menor. No permitimos cuentas de menores de 13 años.
+
 **Para qué los usamos (finalidades necesarias).** Crear y mantener tu cuenta; guardar y sincronizar tus datos entre dispositivos; mostrar tu perfil, estadísticas y récords; preparar rutinas y planes de entrenamiento (en Pro, con ayuda de un sistema de inteligencia artificial y la revisión de un entrenador); cobrar el plan Pro; darte soporte y cumplir obligaciones legales.
 
 **Finalidades secundarias.** Enviarte novedades y promociones de SadBarz y mejorar la app con estadísticas generales. Si no quieres esto, escríbenos a ${L.email}; no afecta tu servicio.
@@ -94,7 +96,7 @@ const termsUs = `*Version ${TERMS_VERSION} · last updated: ${L.updated}*
 
 **2. Agreement.** By creating an account or using SadBarz you agree to these Terms and our Privacy Policy. If you don't agree, don't use the app.
 
-**3. Age.** You must be 18 or older to create an account.
+**3. Age.** SadBarz is for people 13 and older. If you are 13 to 17, a parent or guardian must accept these Terms and the Privacy Policy on your behalf and is responsible for your use of the app and what you upload. Children under 13 may not create an account.
 
 **4. Your account.** You are responsible for the information you give us, for keeping your password safe, and for everything that happens in your account.
 
@@ -151,7 +153,7 @@ const privacyUs = `*Version ${TERMS_VERSION} · last updated: ${L.updated}*
 
 **Security.** Data is encrypted in transit, and in our database each user can only read and change their own data. No system is perfectly secure.
 
-**Children.** SadBarz is for people 18 and older. We don't knowingly collect data from children under 13; if we learn we have, we delete it.
+**Children and teens.** SadBarz is for people 13 and older. Athletes aged 13 to 17 can only use it with the consent of a parent or guardian, given when they first sign in; we keep the guardian's name and email as a record, and the guardian can make privacy requests for the teen. We don't knowingly collect data from children under 13; if we learn we have, we delete it.
 
 **Where data is stored.** Our providers may store and process data in the United States and other countries.
 
