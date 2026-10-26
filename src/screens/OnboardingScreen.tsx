@@ -7,9 +7,8 @@ import { Button, Card, Chip, Field, NumberField, Row, Screen, Segmented, ToggleR
 import { useT, type StringKey } from '../i18n';
 import {
   LB_PER_KG,
-  MAX_AGE,
   MAX_WEIGHT_KG,
-  MIN_AGE,
+  ageRange,
   MIN_WEIGHT_KG,
   isoDate,
   levelFromTest,
@@ -94,7 +93,7 @@ function level(d: Draft): Level | undefined {
   return d.levelSource === 'test' ? levelFromTest(d.maxReps) : d.pickedLevel;
 }
 
-function stepDone(step: Step, d: Draft): boolean {
+function stepDone(step: Step, d: Draft, [minAge, maxAge]: [number, number]): boolean {
   switch (step) {
     case 'goal':
       return !!d.goal;
@@ -110,7 +109,7 @@ function stepDone(step: Step, d: Draft): boolean {
       return !!d.startDate;
     case 'body': {
       const [min, max] = weightLimits(d.unit);
-      return d.age != null && d.age >= MIN_AGE && d.age <= MAX_AGE && d.weight != null && d.weight >= min && d.weight <= max;
+      return d.age != null && d.age >= minAge && d.age <= maxAge && d.weight != null && d.weight >= min && d.weight <= max;
     }
     default:
       return true;
@@ -154,6 +153,7 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
   const t = useT();
   const { settings } = useApp();
   const { user, saveProfile, signOut } = useAuth();
+  const ages = ageRange(!!user?.minor);
   const [d, setD] = useState<Draft>(() => draftFrom(user?.profile ?? null, settings.language));
   const [step, setStep] = useState<Step>(onClose && user?.profile ? 'review' : 'goal');
   // Opened from the review to change one answer: Continue goes straight back to it.
@@ -168,9 +168,9 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
   };
 
   const next = () => {
-    if (!stepDone(step, d)) return;
+    if (!stepDone(step, d, ages)) return;
     if (step === 'days' && !d.startPicked) set({ startDate: nextTrainingDay(d.trainingDays) });
-    if (fromReview && stepDone('start', d)) setStep('review');
+    if (fromReview && stepDone('start', d, ages)) setStep('review');
     else setStep(STEPS[index + 1]);
   };
 
@@ -207,7 +207,7 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
         {step === 'injuries' && !d.injuries.length ? (
           <Button label={t('onb.skip')} variant="ghost" size="lg" flex onPress={next} />
         ) : null}
-        <Button label={t('onb.continue')} size="lg" flex onPress={next} disabled={!stepDone(step, d)} />
+        <Button label={t('onb.continue')} size="lg" flex onPress={next} disabled={!stepDone(step, d, ages)} />
       </Row>
     );
 
@@ -370,7 +370,7 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
         </>
       )}
 
-      {step === 'body' && <BodyStep d={d} set={set} />}
+      {step === 'body' && <BodyStep d={d} set={set} ages={ages} />}
 
       {step === 'injuries' && (
         <>
@@ -427,10 +427,13 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
   );
 }
 
-function BodyStep({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
+function BodyStep({ d, set, ages: [minAge, maxAge] }: { d: Draft; set: (p: Partial<Draft>) => void; ages: [number, number] }) {
   const t = useT();
+  const { user, redoTerms } = useAuth();
   const [min, max] = weightLimits(d.unit);
-  const ageBad = d.age != null && (d.age < MIN_AGE || d.age > MAX_AGE);
+  const ageBad = d.age != null && (d.age < minAge || d.age > maxAge);
+  // The age falls in the other group than the one picked with the terms (adult / 13 to 17).
+  const otherGroup = ageBad && d.age != null && d.age >= ageRange(!user?.minor)[0] && d.age <= ageRange(!user?.minor)[1];
   const weightBad = d.weight != null && (d.weight < min || d.weight > max);
   const changeUnit = (unit: Draft['unit']) => {
     if (unit === d.unit) return;
@@ -464,9 +467,10 @@ function BodyStep({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
         </Card>
         {ageBad ? (
           <Txt variant="small" color={colors.danger}>
-            {t('onb.body.ageError', { min: MIN_AGE, max: MAX_AGE })}
+            {otherGroup ? t(user?.minor ? 'onb.body.ageMinor' : 'onb.body.ageAdult') : t('onb.body.ageError', { min: minAge, max: maxAge })}
           </Txt>
         ) : null}
+        {otherGroup ? <Button label={t('onb.body.ageFix')} size="sm" variant="secondary" onPress={redoTerms} /> : null}
         {weightBad ? (
           <Txt variant="small" color={colors.danger}>
             {t('onb.body.weightError', { min, max, unit: d.unit })}

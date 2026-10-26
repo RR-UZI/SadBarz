@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
+import { LegalLinks, LegalModal } from '../components/LegalModal';
 import { Button, Card, Divider, Row, Screen, Section, Segmented, ToggleRow, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { confirm } from '../lib/confirm';
@@ -11,6 +12,7 @@ import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
+import type { LegalDoc } from '../legal/texts';
 import type { Settings } from '../types';
 
 export function SettingsScreen() {
@@ -19,6 +21,7 @@ export function SettingsScreen() {
   const { settings, updateSettings, reloadExamples, sync, syncNow, avatar } = useApp();
   const { user, mode, signOut } = useAuth();
   const [reloaded, setReloaded] = useState(false);
+  const [legal, setLegal] = useState<LegalDoc | null>(null);
   const set = (patch: Partial<Settings>) => updateSettings(patch);
 
   return (
@@ -210,12 +213,17 @@ export function SettingsScreen() {
         ) : null}
       </Section>
 
+      <Section title={t('settings.legal')}>
+        <LegalLinks onOpen={setLegal} />
+      </Section>
+
       <Divider />
       <Row style={{ justifyContent: 'center' }}>
         <Txt variant="tiny" color={colors.faint}>
           {t('settings.about')}
         </Txt>
       </Row>
+      <LegalModal doc={legal} onClose={() => setLegal(null)} />
     </Screen>
   );
 }

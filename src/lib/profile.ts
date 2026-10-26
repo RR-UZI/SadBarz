@@ -2,7 +2,14 @@
 import type { Level, MaxReps, Profile } from '../types';
 
 export const MIN_AGE = 13;
+// Under this age a parent or guardian accepts the terms for the athlete.
+export const ADULT_AGE = 18;
 export const MAX_AGE = 90;
+
+// Ages onboarding accepts, by the age group picked when accepting the terms.
+export function ageRange(minor: boolean): [number, number] {
+  return minor ? [MIN_AGE, ADULT_AGE - 1] : [ADULT_AGE, MAX_AGE];
+}
 export const MIN_WEIGHT_KG = 30;
 export const MAX_WEIGHT_KG = 250;
 export const LB_PER_KG = 2.20462;

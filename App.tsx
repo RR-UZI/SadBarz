@@ -17,10 +17,12 @@ import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
 import { RoutinesScreen } from './src/screens/RoutinesScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
+import { TermsScreen } from './src/screens/TermsScreen';
 import { QuickTimerScreen, StopwatchScreen, TimersScreen } from './src/screens/TimersScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { AppProvider, useApp } from './src/store/AppStore';
 import { AuthProvider, useAuth } from './src/store/Auth';
+import { TERMS_VERSION } from './src/legal/texts';
 import { colors } from './src/theme';
 
 export default function App() {
@@ -55,6 +57,7 @@ function Root() {
   }
 
   if (!auth.user || auth.recovering) return <AuthScreen />;
+  if (auth.user.termsVersion < TERMS_VERSION) return <TermsScreen />;
   if (!auth.user.profile) return <OnboardingScreen />;
 
   const top = stack[stack.length - 1];
