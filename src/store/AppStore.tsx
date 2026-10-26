@@ -1,4 +1,4 @@
-// App state: exercises, routines, workouts and settings of the signed-in user.
+// App state: exercises, routines, workouts, records and settings of the signed-in user.
 // Each user has a copy on the device (browser storage on web, app storage on the
 // phone) and, with an account, a copy in the cloud that every device merges with.
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -8,7 +8,7 @@ import { AppState, Platform } from 'react-native';
 import { SEED_EXERCISES, seedRoutines } from '../data/seed';
 import { setVolume } from '../lib/sound';
 import { mergeSynced, pullRemote, pushRemote, syncEnabled, syncedKey, type Synced } from '../lib/sync';
-import type { Exercise, Routine, Settings, Workout } from '../types';
+import type { Exercise, PersonalRecord, Routine, Settings, Workout } from '../types';
 import { useAuth } from './Auth';
 
 // Before accounts all data lived under this key; the first user to sign in on the device takes it over.
@@ -44,6 +44,9 @@ interface Data {
   settings: Settings;
   settingsAt: number;
   deleted: Record<string, number>;
+  avatar: string | null;
+  avatarAt: number;
+  records: PersonalRecord[];
 }
 
 // 'off': no cloud (preview mode). 'error': the last sync failed; data is still saved on the device.
@@ -60,13 +63,16 @@ interface AppContextValue extends Data {
   deleteWorkout: (id: string) => void;
   addExercise: (e: Exercise) => void;
   updateSettings: (patch: Partial<Settings>) => void;
+  setAvatar: (dataUrl: string | null) => void;
+  saveRecord: (r: PersonalRecord) => void;
+  deleteRecord: (id: string) => void;
   reloadExamples: () => void;
 }
 
 const AppContext = createContext<AppContextValue | null>(null);
 
 function initialData(settings: Settings = DEFAULT_SETTINGS): Data {
-  return { exercises: SEED_EXERCISES, routines: seedRoutines(), workouts: [], settings, settingsAt: 0, deleted: {} };
+  return { exercises: SEED_EXERCISES, routines: seedRoutines(), workouts: [], settings, settingsAt: 0, deleted: {}, avatar: null, avatarAt: 0, records: [] };
 }
 
 // Swaps the old examples for the current ones. Examples the user edited are kept.
@@ -90,6 +96,9 @@ function fromSaved(saved: Partial<Data> & { version?: number }): Data {
     settings,
     settingsAt: saved.settingsAt ?? 0,
     deleted: saved.deleted ?? {},
+    avatar: saved.avatar ?? null,
+    avatarAt: saved.avatarAt ?? 0,
+    records: saved.records ?? [],
   };
 }
 
@@ -101,6 +110,9 @@ function toSynced(d: Data): Synced {
     settings: d.settings,
     settingsAt: d.settingsAt,
     deleted: d.deleted,
+    avatar: d.avatar,
+    avatarAt: d.avatarAt,
+    records: d.records,
   };
 }
 
@@ -272,6 +284,21 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setData((d) => ({ ...d, settings: { ...d.settings, ...patch }, settingsAt: Date.now() }));
   }, []);
 
+  const setAvatar = useCallback((avatar: string | null) => {
+    setData((d) => ({ ...d, avatar, avatarAt: Date.now() }));
+  }, []);
+
+  const saveRecord = useCallback((r: PersonalRecord) => {
+    setData((d) => {
+      const next = { ...r, updatedAt: Date.now() };
+      return { ...d, records: d.records.some((x) => x.id === r.id) ? d.records.map((x) => (x.id === r.id ? next : x)) : [next, ...d.records] };
+    });
+  }, []);
+
+  const deleteRecord = useCallback((id: string) => {
+    setData((d) => ({ ...d, records: d.records.filter((r) => r.id !== id), deleted: { ...d.deleted, [id]: Date.now() } }));
+  }, []);
+
   const reloadExamples = useCallback(() => {
     setData((d) => {
       const seeds = seedRoutines();
@@ -284,8 +311,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AppContextValue>(
-    () => ({ ...data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, reloadExamples }),
-    [data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, reloadExamples],
+    () => ({ ...data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples }),
+    [data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

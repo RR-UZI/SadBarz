@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View } from 'react-native';
 
+import { Avatar } from '../components/Avatar';
 import { Button, Card, Divider, Row, Screen, Section, Segmented, ToggleRow, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { confirm } from '../lib/confirm';
@@ -15,7 +16,7 @@ import type { Settings } from '../types';
 export function SettingsScreen() {
   const t = useT();
   const nav = useNav();
-  const { settings, updateSettings, reloadExamples, sync, syncNow } = useApp();
+  const { settings, updateSettings, reloadExamples, sync, syncNow, avatar } = useApp();
   const { user, mode, signOut } = useAuth();
   const [reloaded, setReloaded] = useState(false);
   const set = (patch: Partial<Settings>) => updateSettings(patch);
@@ -23,11 +24,19 @@ export function SettingsScreen() {
   return (
     <Screen title={t('settings.title')} onBack={nav.pop}>
       <Section title={t('settings.account')}>
-        <Card>
-          <Txt style={{ fontWeight: '800', fontSize: 17 }}>{user?.name}</Txt>
-          <Txt variant="small" color={colors.muted}>
-            {user?.email}
-          </Txt>
+        <Card onPress={() => nav.push({ name: 'profile' })}>
+          <Row gap={space.md}>
+            <Avatar uri={avatar} name={user?.name} size={48} />
+            <View style={{ flex: 1 }}>
+              <Txt style={{ fontWeight: '800', fontSize: 17 }}>{user?.name}</Txt>
+              <Txt variant="small" color={colors.muted}>
+                {user?.email}
+              </Txt>
+            </View>
+            <Txt variant="small" color={colors.accent}>
+              {t('profile.open')} ›
+            </Txt>
+          </Row>
           {mode === 'preview' ? (
             <Txt variant="tiny" color={colors.warn} style={{ marginTop: 6 }}>
               {t('auth.preview')}
