@@ -8,7 +8,7 @@ import { BlockRunner } from '../components/BlockRunner';
 import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, NumberField, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
-import { defaultEntries, totalReps } from '../lib/blocks';
+import { defaultEntries, forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
 import { sounds, unlockAudio } from '../lib/sound';
 import { useClock } from '../lib/useClock';
@@ -16,7 +16,7 @@ import { clock, uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
-import type { AmrapScore, Block, BlockLog, LogEntry, Workout } from '../types';
+import type { AmrapScore, Block, BlockLog, ForTimeScore, LogEntry, Workout } from '../types';
 import { BlockSummary } from './RoutinesScreen';
 
 type Phase =
@@ -52,6 +52,7 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
   const [logs, setLogs] = useState<BlockLog[]>([]);
   const [entries, setEntries] = useState<LogEntry[]>([]);
   const [score, setScore] = useState<AmrapScore | undefined>();
+  const [forTime, setForTime] = useState<ForTimeScore | undefined>();
   const startedAt = useRef(Date.now());
   const runCount = useRef(0);
 
@@ -76,6 +77,7 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
     if (!block) return logs;
     const log: BlockLog = { blockId: block.id, title: block.title || '', format: block.format, status, durationSec, entries: e };
     if (score && status === 'done') log.score = score;
+    if (forTime && status === 'done') log.forTime = forTime;
     const next = [...logs, log];
     setLogs(next);
     return next;
@@ -156,9 +158,10 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
         <BlockRunner
           key={phase.run}
           block={block}
-          onFinish={(durationSec, amrap) => {
-            setEntries(defaultEntries(block, amrap?.rounds));
+          onFinish={(durationSec, amrap, ft) => {
+            setEntries(defaultEntries(block, amrap?.rounds ?? (ft && ft.timeSec == null ? ft.rounds : undefined)));
             setScore(amrap);
+            setForTime(ft);
             setPhase({ kind: 'review', durationSec });
           }}
         />
@@ -181,6 +184,11 @@ export function WorkoutScreen({ routineId }: { routineId: string }) {
           {score ? (
             <Txt variant="h2" color={colors.accent} style={{ marginBottom: space.sm }}>
               {`AMRAP · ${t('run.score', { rounds: score.rounds, reps: score.reps })}`}
+            </Txt>
+          ) : null}
+          {forTime ? (
+            <Txt variant="h2" color={colors.accent} style={{ marginBottom: space.sm }}>
+              {`For time · ${forTimeText(t, forTime)}`}
             </Txt>
           ) : null}
           <EntryEditor entries={entries} onChange={setEntries} sets={block.format === 'sets'} />

@@ -4,7 +4,7 @@ import { View } from 'react-native';
 import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
-import { totalReps } from '../lib/blocks';
+import { forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
 import { clock, DAY_MS, startOfDay } from '../lib/util';
 import { useNav } from '../navigation';
@@ -122,6 +122,11 @@ export function WorkoutDetailScreen({ id }: { id: string }) {
             {b.score ? (
               <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
                 {`AMRAP · ${t('run.score', { rounds: b.score.rounds, reps: b.score.reps })}`}
+              </Txt>
+            ) : null}
+            {b.forTime ? (
+              <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
+                {`For time · ${forTimeText(t, b.forTime)}`}
               </Txt>
             ) : null}
             <View style={{ marginTop: space.sm, gap: 2 }}>

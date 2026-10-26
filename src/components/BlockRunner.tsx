@@ -1,18 +1,18 @@
-// Runs one block with its timer: EMOM / interval, Tabata, sets with rest, circuit or AMRAP.
+// Runs one block with its timer: EMOM / interval, Tabata, sets with rest, circuit, AMRAP or For time.
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View } from 'react-native';
 
 import { useT } from '../i18n';
-import { buildTimeline, capLabel, DEFAULT_AMRAP_SEC, flattenSets, itemTarget, itemsForRound, segmentAt, timelineLength } from '../lib/blocks';
+import { buildTimeline, capLabel, DEFAULT_AMRAP_SEC, DEFAULT_FORTIME_SEC, flattenSets, forTimeText, itemTarget, itemsForRound, segmentAt, timelineLength } from '../lib/blocks';
 import { sounds, speak, unlockAudio } from '../lib/sound';
 import { useClock } from '../lib/useClock';
 import { clock } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
-import type { AmrapScore, Block, BlockItem, Settings } from '../types';
+import type { AmrapScore, Block, BlockItem, ForTimeScore, Settings } from '../types';
 import { Button, NumberField, Row, Txt } from './ui';
 
-type Props = { block: Block; onFinish: (durationSec: number, score?: AmrapScore) => void };
+type Props = { block: Block; onFinish: (durationSec: number, score?: AmrapScore, forTime?: ForTimeScore) => void };
 
 // The lead-in counts down silently and beeps only on its last seconds (3, 2, 1).
 const LEAD_BEEPS = 3;
@@ -21,6 +21,7 @@ export function BlockRunner(props: Props) {
   if (props.block.format === 'sets') return <SetsRunner {...props} />;
   if (props.block.format === 'circuit') return <CircuitRunner {...props} />;
   if (props.block.format === 'amrap') return <AmrapRunner {...props} />;
+  if (props.block.format === 'fortime') return <ForTimeRunner {...props} />;
   return <TimedRunner {...props} />;
 }
 
@@ -646,6 +647,169 @@ function AmrapRunner({ block, onFinish }: Props) {
         <Button label={t('run.undoRound')} variant="ghost" size="sm" style={{ marginTop: space.sm, alignSelf: 'center' }} onPress={() => setSplits(splits.slice(0, -1))} />
       ) : null}
       <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={stop} />
+    </View>
+  );
+}
+
+// ---------- For time ----------
+
+// The stopwatch counts up until the athlete finishes or the time cap is reached.
+// Finished: the score is the time. Capped: the score is the rounds and reps done.
+function ForTimeRunner({ block, onFinish }: Props) {
+  const t = useT();
+  const { settings } = useApp();
+  const cues = useCues(settings);
+  const c = useClock(100);
+  const cap = block.capSec ?? DEFAULT_FORTIME_SEC;
+  // Time on the clock when each round was finished.
+  const [splits, setSplits] = useState<number[]>([]);
+  const [result, setResult] = useState<{ kind: 'done'; timeSec: number } | { kind: 'capped' } | null>(null);
+  const [reps, setReps] = useState(0);
+  const lastTick = useRef('');
+  const started = useRef(false);
+
+  useEffect(() => {
+    unlockAudio();
+    c.start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const sec = c.elapsedMs / 1000;
+  const lead = settings.leadInSec - sec;
+  const workSec = Math.min(cap, Math.max(0, sec - settings.leadInSec));
+  const left = cap - workSec;
+  const multi = block.rounds > 1;
+  const round = splits.length + 1;
+
+  const finish = () => {
+    c.pause();
+    cues.end();
+    setResult({ kind: 'done', timeSec: workSec });
+  };
+  const capped = () => {
+    c.pause();
+    setResult({ kind: 'capped' });
+  };
+
+  useEffect(() => {
+    if (result) return;
+    if (lead > 0) {
+      const whole = Math.ceil(lead);
+      if (`l${whole}` !== lastTick.current && whole <= Math.min(LEAD_BEEPS, settings.leadInSec)) {
+        lastTick.current = `l${whole}`;
+        cues.tick();
+      }
+      return;
+    }
+    if (!started.current) {
+      started.current = true;
+      cues.start();
+    }
+    if (left <= 0) {
+      cues.end();
+      capped();
+      return;
+    }
+    const whole = Math.ceil(left);
+    if (whole <= LEAD_BEEPS && `e${whole}` !== lastTick.current) {
+      lastTick.current = `e${whole}`;
+      cues.tick();
+    }
+  });
+
+  const roundDone = () => {
+    if (round >= block.rounds) return finish();
+    cues.round(round + 1);
+    setSplits([...splits, workSec]);
+  };
+
+  const splitRow = splits.length ? (
+    <Row style={{ justifyContent: 'center', flexWrap: 'wrap', marginTop: space.md }} gap={space.md}>
+      {splits.map((end, i) => (
+        <Txt key={i} variant="small" color={colors.muted}>
+          {`R${i + 1} ${clock(end - (i ? splits[i - 1] : 0))}`}
+        </Txt>
+      ))}
+    </Row>
+  ) : null;
+
+  if (result?.kind === 'done') {
+    return (
+      <View style={{ alignItems: 'center', gap: space.md, paddingVertical: space.lg }}>
+        <Txt variant="title" color={colors.success}>
+          {t('run.yourTime')}
+        </Txt>
+        <Txt style={{ fontSize: 96, fontWeight: '900', lineHeight: 108, fontVariant: ['tabular-nums'] }} color={colors.accent}>
+          {clock(result.timeSec)}
+        </Txt>
+        <Txt variant="small" color={colors.muted}>
+          {t('run.cap', { time: capLabel(cap) })}
+        </Txt>
+        {splitRow}
+        <Button
+          label={t('run.saveScore')}
+          size="lg"
+          style={{ marginTop: space.lg, alignSelf: 'stretch' }}
+          onPress={() => onFinish(Math.round(result.timeSec), undefined, { timeSec: Math.round(result.timeSec), rounds: block.rounds })}
+        />
+      </View>
+    );
+  }
+
+  if (result?.kind === 'capped') {
+    const rounds = splits.length;
+    return (
+      <View style={{ alignItems: 'center', gap: space.md, paddingVertical: space.lg }}>
+        <Txt variant="title" color={colors.warn}>
+          {left <= 0 ? t('run.capReached') : t('run.blockFinished')}
+        </Txt>
+        <Txt style={{ fontSize: 64, fontWeight: '900', lineHeight: 72, fontVariant: ['tabular-nums'] }} color={colors.muted}>
+          {clock(workSec)}
+        </Txt>
+        {multi ? <Txt variant="h2">{t('run.amrapRounds', { n: rounds })}</Txt> : null}
+        {splitRow}
+        <View style={{ marginTop: space.md }}>
+          <NumberField label={multi ? t('run.extraReps') : t('run.repsDone')} value={reps} min={0} max={9999} width={80} onChange={(v) => setReps(v ?? 0)} />
+        </View>
+        <Txt variant="h2" color={colors.accent} style={{ marginTop: space.sm }}>
+          {`For time · ${forTimeText(t, { reps, rounds })}`}
+        </Txt>
+        <Button
+          label={t('run.saveScore')}
+          size="lg"
+          style={{ marginTop: space.lg, alignSelf: 'stretch' }}
+          onPress={() => onFinish(Math.round(workSec), undefined, { reps, rounds })}
+        />
+      </View>
+    );
+  }
+
+  const final = lead <= 0 && left <= AMRAP_FINAL_SEC;
+  return (
+    <View>
+      {multi ? <RoundDots total={block.rounds} done={splits.length} /> : null}
+      <Txt variant="label" color={colors.muted} style={{ textAlign: 'center', marginTop: multi ? space.md : 0 }}>
+        {`For time · ${t('run.cap', { time: capLabel(cap) })}`}
+      </Txt>
+      {lead > 0 ? (
+        <BigClock seconds={lead} color={colors.warn} label={t('run.getReady')} />
+      ) : (
+        <BigClock seconds={workSec} color={final ? colors.warn : colors.accent} label={t('run.stopwatch')} sub={t('run.capIn', { time: clock(left) })} />
+      )}
+      <ItemLines items={block.items} big={block.items.length <= 3} />
+      {splitRow}
+      {multi && round < block.rounds ? (
+        <Button
+          label={t('run.roundDoneOf', { n: round, total: block.rounds })}
+          size="lg"
+          style={{ marginTop: space.xl }}
+          onPress={roundDone}
+          disabled={lead > 0}
+        />
+      ) : (
+        <Button label={`🏁 ${t('run.finished')}`} size="lg" style={{ marginTop: space.xl, minHeight: 72 }} onPress={finish} disabled={lead > 0} />
+      )}
+      <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={capped} />
     </View>
   );
 }

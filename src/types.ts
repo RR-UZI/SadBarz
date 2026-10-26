@@ -40,7 +40,8 @@ export interface SetRow {
 // sets    = sets x reps with rest between (pyramids, weighted work)
 // circuit = list of moves for X rounds, stopwatch running
 // amrap   = as many rounds as possible before the time cap runs out
-export type BlockFormat = 'emom' | 'tabata' | 'sets' | 'circuit' | 'amrap';
+// fortime = the list (or N rounds of it) once, as fast as possible, under a time cap
+export type BlockFormat = 'emom' | 'tabata' | 'sets' | 'circuit' | 'amrap' | 'fortime';
 
 export interface Block {
   id: string;
@@ -49,11 +50,11 @@ export interface Block {
   items: BlockItem[]; // emom, tabata, circuit, amrap
   rows: SetRow[]; // sets
   intervalSec: number; // emom
-  rounds: number; // emom, tabata, circuit
+  rounds: number; // emom, tabata, circuit, fortime
   perRound: 'all' | 'rotate'; // emom/tabata: all items every round, or one item per round in turn
   workSec: number; // tabata
   restSec: number; // tabata
-  capSec?: number; // amrap: time cap
+  capSec?: number; // amrap, fortime: time cap
   restAfterSec?: number; // the routine's suggested break after this block
   note?: string;
 }
@@ -89,12 +90,20 @@ export interface BlockLog {
   durationSec: number;
   entries: LogEntry[];
   score?: AmrapScore; // amrap
+  forTime?: ForTimeScore; // fortime
 }
 
 // AMRAP result: full rounds plus the reps done in the unfinished round.
 export interface AmrapScore {
   rounds: number;
   reps: number;
+}
+
+// For time result: the finish time, or (time cap reached / stopped early) the reps done.
+export interface ForTimeScore {
+  timeSec?: number; // finished: total time
+  reps?: number; // not finished: reps done by the cap
+  rounds: number; // full rounds done
 }
 
 export interface Workout {
@@ -129,7 +138,7 @@ export interface Settings {
 // ---------- Training profile (onboarding answers) ----------
 // The coach builds the weekly plan from these, so keep the values plain and stable.
 
-export type Goal = 'endurance' | 'skills' | 'statics' | 'fitness';
+export type Goal = 'compete' | 'endurance' | 'strength' | 'skills' | 'statics' | 'fitness';
 export type Level = 'beginner' | 'intermediate' | 'advanced';
 export type Equipment = 'bar' | 'dips' | 'parallettes' | 'rings' | 'bands' | 'weights' | 'tubes' | 'none';
 export type Skill = 'handstand' | 'lsit' | 'frontLever' | 'backLever' | 'planche';

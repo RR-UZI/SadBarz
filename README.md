@@ -1,21 +1,21 @@
 # SadBarz
 
-Calisthenics app and personal coach: build routines, run them with built-in timers (EMOM, EM2M, Tabata, sets with rest, circuits, AMRAP), log every set, and (with Pro, coming later) let the coach make the next session harder as you get stronger.
+Calisthenics app and personal coach: build routines, run them with built-in timers (EMOM, EM2M, Tabata, sets with rest, circuits, AMRAP, For time), log every set, and (with Pro, coming later) let the coach make the next session harder as you get stronger.
 
 One codebase for web, iPhone and Android (Expo / React Native). Spanish first, switchable to English in Settings. Dark theme.
 
 ## What works now (web prototype, Free features)
 
 - **Routines**: create, edit, duplicate, delete. A routine is a list of blocks.
-- **Block formats**: EMOM / every N seconds (E30", E50", EM2M...), Tabata (work / rest), sets with rest (pyramids, weighted work, pairs), circuit (stopwatch + rounds; after each round it asks to start the next one, then counts down 3 seconds), AMRAP (time cap countdown, "+1 ronda" counter, extra reps at the end; the score "5 rondas + 8 reps" is saved to the history). Each exercise can have reps, seconds, meters, calories, added weight (+kg), "max" and a note (DS, unbroken...).
+- **Block formats**: EMOM / every N seconds (E30", E50", EM2M...), Tabata (work / rest), sets with rest (pyramids, weighted work, pairs), circuit (stopwatch + rounds; after each round it asks to start the next one, then counts down 3 seconds), AMRAP (time cap countdown, "+1 ronda" counter, extra reps at the end; the score "5 rondas + 8 reps" is saved to the history), For time (stopwatch counts up to a time cap, optional rounds with "Terminé la ronda N", then "¡Terminé!" saves the time; if the cap hits first it asks for the reps done and saves "tope · 2 rondas + 15 reps"). Each exercise can have reps, seconds, meters, calories, added weight (+kg), "max" and a note (DS, unbroken...).
 - **Workout mode**: the timer runs inside the routine. 10-second get-ready countdown (beeps on 3-2-1), start sound, sound every round, last-seconds beeps, end sound. After each block: Done (reps and weight pre-filled, editable), Repeat, Skip, or Finish workout. Then a 1, 2, 3 or 5 min break (the routine's own rest highlighted), and the next block waits for Start.
 - **Timers tab**: EMOM, Tabata / intervals, countdown and stopwatch without a routine.
 - **History**: last 2 weeks (Free plan).
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.
 - **Example routines** from Uzi's own training, one per weekday: Monday weighted push and pull, Tuesday tubes, reps and cardio, Wednesday legs and abs, Thursday pull, push and tubes, Friday full body.
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
-- **Athlete profile** (every plan): tap the photo on Home, or the account card in Settings. Profile photo (cut to a square and shrunk to 256 px, saved with the user's data so every device shows it), stats (workouts, hours, reps, weeks in a row), personal records added by hand (max reps, hold seconds, added weight, or finish time of a test), and best marks read from the workout log (most reps in a set, longest hold, heaviest added weight, best AMRAP score). Tapping a logged mark saves it as a PR.
-- **Onboarding**: after the first sign in, nine questions for the coach (goal, max reps test or level, equipment, training days, session length, start date, age and weight, injuries, reminders), then a review. Answers can be changed in Settings.
+- **Athlete profile** (every plan): tap the photo on Home, or the account card in Settings. Profile photo (cut to a square and shrunk to 256 px, saved with the user's data so every device shows it), stats (workouts, hours, reps, weeks in a row), personal records added by hand (max reps, hold seconds, added weight, or finish time of a test), and best marks read from the workout log (most reps in a set, longest hold, heaviest added weight, best AMRAP score, best For time). Tapping a logged mark saves it as a PR.
+- **Onboarding**: after the first sign in, nine questions for the coach (goal: compete, endurance, strength, skills, statics or get fit; max reps test or level, equipment, training days (up to 6, one rest day a week), session length, start date, age and weight, injuries, reminders), then a review. Answers can be changed in Settings.
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
 

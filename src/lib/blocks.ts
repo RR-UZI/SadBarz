@@ -1,8 +1,10 @@
 // Helpers to create, describe and time blocks.
-import type { Block, BlockFormat, BlockItem, Exercise, LogEntry, SetRow } from '../types';
+import type { StringKey } from '../i18n/es';
+import type { Block, BlockFormat, BlockItem, Exercise, ForTimeScore, LogEntry, SetRow } from '../types';
 import { clock, shortDuration, uid } from './util';
 
 export const DEFAULT_AMRAP_SEC = 600;
+export const DEFAULT_FORTIME_SEC = 900;
 
 export function newItem(exerciseId: string, kind: Exercise['kind'] = 'reps'): BlockItem {
   const item: BlockItem = { id: uid('it'), exerciseId };
@@ -24,11 +26,11 @@ export function newBlock(format: BlockFormat = 'emom'): Block {
     items: [],
     rows: format === 'sets' ? [newRow()] : [],
     intervalSec: 60,
-    rounds: format === 'tabata' ? 8 : format === 'circuit' ? 3 : 10,
+    rounds: format === 'tabata' ? 8 : format === 'circuit' ? 3 : format === 'fortime' ? 1 : 10,
     perRound: 'all',
     workSec: 20,
     restSec: 10,
-    ...(format === 'amrap' ? { capSec: DEFAULT_AMRAP_SEC } : {}),
+    ...(format === 'amrap' ? { capSec: DEFAULT_AMRAP_SEC } : format === 'fortime' ? { capSec: DEFAULT_FORTIME_SEC } : {}),
   };
 }
 
@@ -44,11 +46,13 @@ export function blockDurationSec(b: Block): number {
       return 0;
     case 'amrap':
       return b.capSec ?? DEFAULT_AMRAP_SEC;
+    case 'fortime':
+      return b.capSec ?? DEFAULT_FORTIME_SEC;
   }
 }
 
 // Short label like 'EMOM 50" · 12 rondas' or 'EM2M · 6 rondas'.
-export function formatLabel(b: Block, roundsWord: string, setsWord: string): string {
+export function formatLabel(b: Block, roundsWord: string, setsWord: string, capWord: string): string {
   switch (b.format) {
     case 'emom': {
       const name = b.intervalSec === 60 ? 'EMOM' : b.intervalSec === 120 ? 'EM2M' : `EMOM ${shortDuration(b.intervalSec)}`;
@@ -62,12 +66,21 @@ export function formatLabel(b: Block, roundsWord: string, setsWord: string): str
       return `Circuito · ${b.rounds} ${roundsWord}`;
     case 'amrap':
       return `AMRAP ${capLabel(b.capSec ?? DEFAULT_AMRAP_SEC)}`;
+    case 'fortime':
+      return `${b.rounds > 1 ? `${b.rounds} ${roundsWord} ` : ''}For time · ${capWord} ${capLabel(b.capSec ?? DEFAULT_FORTIME_SEC)}`;
   }
 }
 
 // '12 min', or '7:30' when the cap is not whole minutes.
 export function capLabel(sec: number): string {
   return sec % 60 === 0 ? `${sec / 60} min` : clock(sec);
+}
+
+// '12:34', or the rounds and reps done when the cap was reached ('tope · 2 rondas + 15 reps').
+export function forTimeText(t: (key: StringKey, vars?: Record<string, string | number>) => string, s: ForTimeScore): string {
+  if (s.timeSec != null) return t('run.forTimeDone', { time: clock(s.timeSec) });
+  if (s.rounds > 0) return t('run.forTimeCappedRounds', { rounds: s.rounds, reps: s.reps ?? 0 });
+  return t('run.forTimeCapped', { reps: s.reps ?? 0 });
 }
 
 // Alternating blocks take turns: one item per round, or several items that share a `turn`.
@@ -107,7 +120,7 @@ export function itemTarget(item: BlockItem, maxWord: string): string {
 }
 
 // Pre-filled log entries for a finished block: what the plan said, all rounds done.
-// For an AMRAP, `roundsDone` is how many full rounds were finished.
+// For an AMRAP or an unfinished For time, `roundsDone` is how many full rounds were finished.
 export function defaultEntries(b: Block, roundsDone?: number): LogEntry[] {
   const fromItem = (it: BlockItem, rounds: number): LogEntry => ({
     exerciseId: it.exerciseId,
@@ -120,6 +133,9 @@ export function defaultEntries(b: Block, roundsDone?: number): LogEntry[] {
   });
   if (b.format === 'amrap') {
     return b.items.map((it) => fromItem(it, roundsDone ?? 0));
+  }
+  if (b.format === 'fortime') {
+    return b.items.map((it) => fromItem(it, roundsDone ?? b.rounds));
   }
   if (b.format === 'sets') {
     return b.rows.flatMap((r) => r.items.map((it) => fromItem(it, r.sets)));

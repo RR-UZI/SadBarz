@@ -28,6 +28,7 @@ export function TimersScreen() {
   const [cdMin, setCdMin] = useState(5);
   const [cdSec, setCdSec] = useState(0);
   const [amrapMin, setAmrapMin] = useState(10);
+  const [forTimeMin, setForTimeMin] = useState(15);
 
   const launch = (block: Block, title: string) => {
     unlockAudio();
@@ -91,6 +92,17 @@ export function TimersScreen() {
         </View>
         <NumberField label={t('timers.minutes')} value={amrapMin} min={1} max={120} onChange={(v) => setAmrapMin(v ?? 10)} />
         <Button label={`▶ ${t('common.start')}`} onPress={() => launch({ ...newBlock('amrap'), capSec: amrapMin * 60 }, `AMRAP ${amrapMin} min`)} />
+      </Card>
+
+      <Card style={{ marginTop: space.md, gap: space.md }}>
+        <View>
+          <Txt variant="h2">{t('timers.fortime')}</Txt>
+          <Txt variant="small" color={colors.muted}>
+            {t('timers.fortimeHelp')}
+          </Txt>
+        </View>
+        <NumberField label={t('block.cap')} value={forTimeMin} min={1} max={120} onChange={(v) => setForTimeMin(v ?? 15)} />
+        <Button label={`▶ ${t('common.start')}`} onPress={() => launch({ ...newBlock('fortime'), capSec: forTimeMin * 60 }, `For time · ${forTimeMin} min`)} />
       </Card>
 
       <Card style={{ marginTop: space.md, gap: space.md }}>

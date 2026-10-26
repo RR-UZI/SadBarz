@@ -8,8 +8,9 @@ import { Badge, Button, Card, Field, NumberField, Row, Screen, Section, Segmente
 import { COMPETITIONS } from '../data/seed';
 import { useT } from '../i18n';
 import { pickAvatar } from '../lib/avatar';
+import { forTimeText } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
-import { amrapBests, isoDay, loggedBests, profileStats, recordValue } from '../lib/records';
+import { amrapBests, forTimeBests, isoDay, loggedBests, profileStats, recordValue } from '../lib/records';
 import { uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -42,6 +43,7 @@ export function ProfileScreen() {
   const stats = useMemo(() => profileStats(workouts), [workouts]);
   const bests = useMemo(() => loggedBests(workouts, exerciseById), [workouts, exerciseById]);
   const amraps = useMemo(() => amrapBests(workouts), [workouts]);
+  const forTimes = useMemo(() => forTimeBests(workouts), [workouts]);
   const shown = showAll ? bests : bests.slice(0, SHOW_FIRST);
   const sorted = [...records].sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
 
@@ -133,7 +135,7 @@ export function ProfileScreen() {
 
       <Section title={t('profile.logged')}>
         <Txt variant="small" color={colors.muted} style={{ marginBottom: space.sm }}>
-          {bests.length || amraps.length ? t('profile.loggedHelp') : t('profile.noLogged')}
+          {bests.length || amraps.length || forTimes.length ? t('profile.loggedHelp') : t('profile.noLogged')}
         </Txt>
         {shown.length ? (
           <Card style={{ paddingVertical: space.xs }}>
@@ -188,6 +190,26 @@ export function ProfileScreen() {
                     </Txt>
                   </View>
                   <Txt style={{ fontWeight: '800' }}>{t('run.score', { rounds: a.rounds, reps: a.reps })}</Txt>
+                </Row>
+              ))}
+            </Card>
+          </>
+        ) : null}
+        {forTimes.length ? (
+          <>
+            <Txt variant="label" style={{ marginTop: space.lg, marginBottom: space.sm }}>
+              {t('profile.fortime')}
+            </Txt>
+            <Card style={{ paddingVertical: space.xs }}>
+              {forTimes.map((f, i) => (
+                <Row key={f.key} style={{ justifyContent: 'space-between', paddingVertical: space.sm, borderTopWidth: i ? 1 : 0, borderTopColor: colors.border }}>
+                  <View style={{ flex: 1 }}>
+                    <Txt numberOfLines={1}>{f.name}</Txt>
+                    <Txt variant="tiny" color={colors.muted}>
+                      {dayText(f.at)}
+                    </Txt>
+                  </View>
+                  <Txt style={{ fontWeight: '800' }}>{forTimeText(t, f.score)}</Txt>
                 </Row>
               ))}
             </Card>

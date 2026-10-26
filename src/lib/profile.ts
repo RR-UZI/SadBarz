@@ -3,6 +3,8 @@ import type { Level, MaxReps, Profile } from '../types';
 
 export const MIN_AGE = 13;
 export const MAX_AGE = 90;
+// Everyone keeps at least one rest day a week.
+export const MAX_TRAINING_DAYS = 6;
 export const MIN_WEIGHT_KG = 30;
 export const MAX_WEIGHT_KG = 250;
 export const LB_PER_KG = 2.20462;

@@ -83,7 +83,7 @@ export function HomeScreen() {
                     {r.name}
                   </Txt>
                   <Txt variant="small" color={colors.muted} numberOfLines={1}>
-                    {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'))).join(' · ')}
+                    {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))).join(' · ')}
                   </Txt>
                 </View>
                 <Button label={t('common.start')} size="sm" onPress={() => nav.push({ name: 'workout', routineId: r.id })} />
