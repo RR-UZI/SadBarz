@@ -2,7 +2,7 @@
 // `user_data`, readable and writable only by that user (row level security,
 // see supabase/migrations). Devices merge their copy with the cloud one, so a
 // routine made on the laptop shows up on the phone and the other way round.
-import type { Exercise, Routine, Settings, Workout } from '../types';
+import type { Exercise, PersonalRecord, Routine, Settings, Workout } from '../types';
 import { supabase } from './supabase';
 
 export const SYNC_TABLE = 'user_data';
@@ -15,6 +15,9 @@ export interface Synced {
   settings: Settings;
   settingsAt: number; // when the settings last changed
   deleted: Record<string, number>; // id -> when it was deleted, so a delete reaches every device
+  avatar: string | null; // profile photo, a small JPEG data URL
+  avatarAt: number; // when the photo last changed
+  records: PersonalRecord[];
 }
 
 export const syncEnabled = !!supabase;
@@ -41,7 +44,7 @@ function byId<T extends { id: string }>(a: T[], b: T[], pick: (x: T, y: T) => T)
 }
 
 // Combines two copies: everything from both, the newest version of each routine,
-// newest settings, and anything deleted on either side stays deleted.
+// newest settings and photo, and anything deleted on either side stays deleted.
 export function mergeSynced(local: Synced, remote: Partial<Synced>): Synced {
   const deleted = { ...(remote.deleted ?? {}) };
   for (const [id, at] of Object.entries(local.deleted)) deleted[id] = Math.max(at, deleted[id] ?? 0);
@@ -58,9 +61,11 @@ export function mergeSynced(local: Synced, remote: Partial<Synced>): Synced {
     .filter((w) => !(w.id in deleted))
     .sort((x, y) => y.startedAt - x.startedAt);
   const exercises = byId(local.exercises, remote.exercises ?? [], (x) => x).filter((e) => !(e.id in deleted));
+  const records = byId(local.records, remote.records ?? [], (x, y) => (y.updatedAt > x.updatedAt ? y : x)).filter((r) => !(r.id in deleted));
 
   // On a tie the cloud wins, so two devices never keep overwriting each other.
   const remoteNewer = !!remote.settings && (remote.settingsAt ?? 0) >= local.settingsAt;
+  const remotePhoto = remote.avatarAt != null && remote.avatarAt >= local.avatarAt;
   return {
     routines,
     workouts,
@@ -68,6 +73,9 @@ export function mergeSynced(local: Synced, remote: Partial<Synced>): Synced {
     settings: remoteNewer ? { ...local.settings, ...remote.settings } : local.settings,
     settingsAt: remoteNewer ? (remote.settingsAt ?? 0) : local.settingsAt,
     deleted,
+    avatar: remotePhoto ? (remote.avatar ?? null) : local.avatar,
+    avatarAt: remotePhoto ? remote.avatarAt! : local.avatarAt,
+    records,
   };
 }
 

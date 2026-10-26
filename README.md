@@ -14,6 +14,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **Settings**: language, every timer sound and beep, voice cues, vibration, break behavior, keep screen on, volume.
 - **Example routines** from Uzi's own training, one per weekday: Monday weighted push and pull, Tuesday tubes, reps and cardio, Wednesday legs and abs, Thursday pull, push and tubes, Friday full body.
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
+- **Athlete profile** (every plan): tap the photo on Home, or the account card in Settings. Profile photo (cut to a square and shrunk to 256 px, saved with the user's data so every device shows it), stats (workouts, hours, reps, weeks in a row), personal records added by hand (max reps, hold seconds, added weight, or finish time of a test), and best marks read from the workout log (most reps in a set, longest hold, heaviest added weight, best AMRAP score). Tapping a logged mark saves it as a PR.
 - **Onboarding**: after the first sign in, nine questions for the coach (goal, max reps test or level, equipment, training days, session length, start date, age and weight, injuries, reminders), then a review. Answers can be changed in Settings.
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
@@ -46,7 +47,7 @@ Sign up and log in use [Supabase Auth](https://supabase.com/docs/guides/auth), p
 
 The onboarding answers are saved in the account's user metadata under `profile` (see `Profile` in `src/types.ts`), so they follow the user to any device and a server function can read them when it builds the plan. No table is needed for this.
 
-**Routines, workouts, own exercises and settings** are saved per user in the table `public.user_data` (one row per user, a JSON copy of their data). Row level security lets each signed-in user read and write only their own row. Create it once by pasting `supabase/migrations/20261024000000_user_data.sql` into **SQL Editor → New query → Run**. Each device keeps its own copy too (`sadbarz:v1:<user id>`), works offline, and merges with the cloud copy on sign in, when the app comes back to the front, and a moment after every change (`src/lib/sync.ts`). Settings → Datos shows whether the last sync worked.
+**Routines, workouts, own exercises, settings, profile photo and PRs** are saved per user in the table `public.user_data` (one row per user, a JSON copy of their data). Row level security lets each signed-in user read and write only their own row. Create it once by pasting `supabase/migrations/20261024000000_user_data.sql` into **SQL Editor → New query → Run**. Each device keeps its own copy too (`sadbarz:v1:<user id>`), works offline, and merges with the cloud copy on sign in, when the app comes back to the front, and a moment after every change (`src/lib/sync.ts`). Settings → Datos shows whether the last sync worked.
 
 **Free vs Pro.** Free accounts keep up to 5 of their own routines (`FREE_ROUTINE_LIMIT` in `src/lib/plan.ts`; the example routines don't count). Creating or duplicating a 6th opens the Pro pop-up instead (`src/components/ProHost.tsx`), whose "Quiero Pro" button stores `pro_interest_at` in the user's metadata until payments exist. An account is Pro when its **app_metadata** has `"plan": "pro"`. Only the server can set that, so users can't upgrade themselves. To make an account Pro by hand, run this in the SQL Editor (the user signs out and in again to see it):
 
@@ -67,6 +68,7 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 | `App.tsx` | Providers, tab bar, screen switching |
 | `src/lib/plan.ts`, `src/components/ProHost.tsx` | Free plan limits and the Pro pop-up |
 | `src/lib/sync.ts` | Per-user cloud copy: pull, merge, push |
+| `src/lib/records.ts`, `src/lib/avatar.ts`, `src/screens/ProfileScreen.tsx` | Athlete profile: stats, logged bests, PRs, profile photo |
 | `supabase/migrations/` | SQL for the Supabase tables |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
 | `src/store/AppStore.tsx` | App state per user: device copy plus cloud sync |
@@ -75,7 +77,7 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 | `src/lib/sound.ts` | Beeps, voice cues, vibration |
 | `src/components/BlockRunner.tsx` | The timer for each block format |
 | `src/components/BlockEditor.tsx` | Editing a block |
-| `src/screens/` | Home, Routines, Editor, Workout, Timers, History, Settings, Auth, Onboarding |
+| `src/screens/` | Home, Routines, Editor, Workout, Timers, History, Profile, Settings, Auth, Onboarding |
 | `src/lib/profile.ts` | Onboarding helpers: starting level from the max reps test, next training day |
 | `src/i18n/` | Spanish and English text |
 

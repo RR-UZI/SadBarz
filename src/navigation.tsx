@@ -2,7 +2,7 @@
 // Kept simple on purpose so the web build works from any URL.
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
-import type { Block } from './types';
+import type { Block, PersonalRecord } from './types';
 
 export type TabName = 'home' | 'routines' | 'timers' | 'history';
 
@@ -14,7 +14,9 @@ export type Route =
   | { name: 'stopwatch' }
   | { name: 'workoutDetail'; id: string }
   | { name: 'settings' }
-  | { name: 'editProfile' };
+  | { name: 'editProfile' }
+  | { name: 'profile' }
+  | { name: 'editRecord'; id?: string; draft?: Partial<PersonalRecord> };
 
 interface Nav {
   tab: TabName;

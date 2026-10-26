@@ -11,6 +11,7 @@ import { NavProvider, useNav, type Route, type TabName } from './src/navigation'
 import { AuthScreen } from './src/screens/AuthScreen';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { ProfileScreen, RecordEditorScreen } from './src/screens/ProfileScreen';
 import { EditProfileScreen, OnboardingScreen } from './src/screens/OnboardingScreen';
 import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
@@ -90,6 +91,10 @@ function renderRoute(r: Route) {
       return <SettingsScreen />;
     case 'editProfile':
       return <EditProfileScreen />;
+    case 'profile':
+      return <ProfileScreen />;
+    case 'editRecord':
+      return <RecordEditorScreen id={r.id} draft={r.draft} />;
   }
 }
 

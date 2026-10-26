@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
+import { Avatar } from '../components/Avatar';
 import { Badge, Button, Card, Row, Screen, Section, Txt } from '../components/ui';
 import { WEEK_ROUTINE_IDS } from '../data/seed';
 import { useT } from '../i18n';
@@ -14,7 +15,7 @@ import { WorkoutCard } from './HistoryScreen';
 
 export function HomeScreen() {
   const t = useT();
-  const { routines, workouts } = useApp();
+  const { routines, workouts, avatar } = useApp();
   const { user } = useAuth();
   const nav = useNav();
 
@@ -29,9 +30,14 @@ export function HomeScreen() {
   return (
     <Screen
       right={
-        <Pressable onPress={() => nav.push({ name: 'settings' })} hitSlop={10} accessibilityLabel={t('settings.title')} style={{ padding: 6 }}>
-          <Text style={{ color: colors.muted, fontSize: 24 }}>⚙</Text>
-        </Pressable>
+        <Row gap={space.xs}>
+          <Pressable onPress={() => nav.push({ name: 'settings' })} hitSlop={10} accessibilityLabel={t('settings.title')} style={{ padding: 6 }}>
+            <Text style={{ color: colors.muted, fontSize: 24 }}>⚙</Text>
+          </Pressable>
+          <Pressable onPress={() => nav.push({ name: 'profile' })} hitSlop={6} accessibilityLabel={t('profile.title')}>
+            <Avatar uri={avatar} name={user?.name} size={34} />
+          </Pressable>
+        </Row>
       }
       title=" "
       mark

@@ -167,3 +167,22 @@ export interface Profile {
   reminderTime: string;
   updatedAt: string;
 }
+
+// ---------- Athlete profile: photo and personal records ----------
+
+// reps = most reps in one set, sec = longest hold, kg = most added weight,
+// time = fastest finish of a routine or test (lower is better).
+export type RecordUnit = 'reps' | 'sec' | 'kg' | 'time';
+
+// A record the athlete writes down by hand (a test day, a competition...).
+export interface PersonalRecord {
+  id: string;
+  name: string; // the move or the test, as shown
+  exerciseId?: string; // set when it was picked from the exercise list
+  unit: RecordUnit;
+  value: number; // reps, seconds or kg
+  reps?: number; // kg: lifted for this many reps
+  date: string; // YYYY-MM-DD
+  note?: string;
+  updatedAt: number;
+}
