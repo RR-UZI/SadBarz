@@ -45,7 +45,6 @@ export function asProfile(v: unknown): Profile | null {
   if (!v || typeof v !== 'object') return null;
   const p = v as Partial<Profile>;
   if (p.version !== 1 || !p.goal || !p.level || !Array.isArray(p.trainingDays) || !p.trainingDays.length) return null;
-  if (!p.startDate || typeof p.age !== 'number' || typeof p.weightKg !== 'number') return null;
   return {
     ...p,
     skills: p.skills ?? [],

@@ -151,6 +151,61 @@ export interface MaxReps {
   muscleUps: number;
 }
 
+// ---------- Pro questionnaire: extra questions for each goal ----------
+
+// Statics: the hardest stage held (index into STATIC_STAGES in lib/questionnaire) and for how long.
+export interface StaticHold {
+  stage: number;
+  sec: number;
+}
+
+export type SkillMove = 'muscleUpBar' | 'muscleUpRings' | 'wallHandstand' | 'freeHandstand' | 'hspu' | 'lsit' | 'pistol' | 'dragonFlag' | 'humanFlag';
+export type SkillStage = 'far' | 'basics' | 'progressions' | 'sometimes' | 'polish';
+export type SkillBlocker = 'strength' | 'technique' | 'fear' | 'mobility' | 'unsure';
+export type CompeteFormat = 'fortime' | 'amrap' | 'maxReps' | 'freestyle' | 'unsure';
+export type CompeteCategory = 'beginner' | 'intermediate' | 'advanced' | 'elite' | 'other';
+export type WeakMove = 'pullUps' | 'dips' | 'pushUps' | 'muscleUps' | 'squats' | 'burpees' | 'handstand' | 'lsit';
+export type FitnessWant = 'fatLoss' | 'muscle' | 'mobility' | 'energy' | 'health';
+export type Layoff = 'now' | 'lt6m' | 'm6to2y' | 'gt2y' | 'never';
+export type OtherSport = 'running' | 'soccer' | 'gym' | 'other' | 'none';
+export type DayType = 'sitting' | 'standing' | 'physical';
+export type Lift = 'pullUp' | 'dip' | 'muscleUp' | 'squat';
+
+export interface GoalDetails {
+  statics?: { holds: Partial<Record<Skill, StaticHold>> };
+  endurance?: { squats?: number; pistols?: number; legRaises?: number; hspu?: number };
+  // Added weight in kg (squat: total bar weight) and the reps done with it.
+  strength?: { lifts: Partial<Record<Lift, { kg: number; reps: number }>> };
+  skills?: {
+    have: Partial<Record<SkillMove, number>>; // reps, or seconds for holds
+    first?: SkillMove;
+    second?: SkillMove;
+    stage?: SkillStage;
+    blocker?: SkillBlocker;
+    minutes?: number;
+  };
+  compete?: {
+    event?: string; // one of COMPETITIONS, or what they typed
+    date?: string; // YYYY-MM-DD
+    category?: CompeteCategory;
+    formats: CompeteFormat[];
+    pistols?: number;
+    lastResult?: string;
+    weakest?: WeakMove;
+  };
+  fitness?: {
+    wants: FitnessWant[];
+    layoff?: Layoff;
+    pushUps?: number;
+    squats1min?: number;
+    plankSec?: number;
+    hangSec?: number;
+    sports: OtherSport[];
+    day?: DayType;
+    targetKg?: number;
+  };
+}
+
 export interface Profile {
   version: 1;
   goal: Goal;
@@ -162,13 +217,16 @@ export interface Profile {
   equipment: Equipment[];
   /** 0 = Monday … 6 = Sunday. The count is the days per week. */
   trainingDays: number[];
+  // The rest is asked only in the full Pro questionnaire; a free account's profile may not have it.
   /** 0 = no time limit. */
-  sessionMin: 0 | 30 | 45 | 60 | 90;
+  sessionMin?: 0 | 30 | 45 | 60 | 90;
   /** First day of the plan, YYYY-MM-DD. */
-  startDate: string;
-  age: number;
-  weightKg: number;
+  startDate?: string;
+  age?: number;
+  weightKg?: number;
   sex?: 'male' | 'female';
+  /** Answers to the goal questions, kept per goal so switching back keeps them. */
+  details?: GoalDetails;
   injuries: Injury[];
   injuryNote?: string;
   reminders: boolean;

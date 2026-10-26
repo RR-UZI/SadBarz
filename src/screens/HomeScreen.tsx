@@ -6,6 +6,7 @@ import { Badge, Button, Card, Row, Screen, Section, Txt } from '../components/ui
 import { WEEK_ROUTINE_IDS } from '../data/seed';
 import { useT } from '../i18n';
 import { formatLabel } from '../lib/blocks';
+import { fullProfile } from '../lib/questionnaire';
 import { startOfWeek } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -17,6 +18,7 @@ export function HomeScreen() {
   const t = useT();
   const { routines, workouts, avatar } = useApp();
   const { user } = useAuth();
+  const proMissing = user?.plan === 'pro' && !!user.profile && !fullProfile(user.profile);
   const nav = useNav();
 
   const weekStart = startOfWeek(Date.now());
@@ -95,11 +97,13 @@ export function HomeScreen() {
 
       <Section title={t('home.coachTitle')} right={<Badge label="PRO" color={colors.accent} textColor={colors.accentText} />}>
         <Card style={{ borderColor: colors.faint, borderStyle: 'dashed' }}>
-          <Txt>{user?.profile ? t('home.coachReady') : t('home.coachBody')}</Txt>
+          <Txt>{proMissing ? t('home.completePro') : user?.profile ? t('home.coachReady') : t('home.coachBody')}</Txt>
           <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm }}>
             {t('home.soon')}
           </Txt>
-          {user?.profile ? (
+          {proMissing ? (
+            <Button label={t('home.completeProButton')} size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
+          ) : user?.profile ? (
             <Button label={t('home.viewProfile')} variant="ghost" size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
           ) : null}
         </Card>

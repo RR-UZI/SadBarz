@@ -1,10 +1,13 @@
 // The questions the coach needs to build a plan: shown once after sign up, and
 // again from Settings to change the answers. One question per screen, then a review.
+// Free accounts answer the short version; Pro answers the full one, with the goal questions.
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { Calendar, LinkButton, longDate, Option, Title } from '../components/onboarding';
 import { Button, Card, Chip, Field, NumberField, Row, Screen, Segmented, ToggleRow, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
+import { detailsDone, FULL_STEPS, fullProfile, SHORT_STEPS, STATIC_STAGES, type Step } from '../lib/questionnaire';
 import {
   LB_PER_KG,
   MAX_AGE,
@@ -12,21 +15,15 @@ import {
   MAX_WEIGHT_KG,
   MIN_AGE,
   MIN_WEIGHT_KG,
-  isoDate,
   levelFromTest,
   nextTrainingDay,
-  parseIsoDate,
-  weekday,
 } from '../lib/profile';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth, type AuthError } from '../store/Auth';
 import { colors, radius, space } from '../theme';
-import type { Equipment, Goal, Injury, Level, MaxReps, Profile, Skill } from '../types';
-
-const STEPS = ['goal', 'level', 'equipment', 'days', 'session', 'start', 'body', 'injuries', 'reminders', 'review'] as const;
-type Step = (typeof STEPS)[number];
-const QUESTIONS = STEPS.length - 1;
+import type { Equipment, Goal, GoalDetails, Injury, Level, MaxReps, Profile, Skill } from '../types';
+import { GoalDetailsStep } from './GoalDetailsStep';
 
 const GOALS: Goal[] = ['compete', 'endurance', 'strength', 'skills', 'statics', 'fitness'];
 const LEVELS: Level[] = ['beginner', 'intermediate', 'advanced'];
@@ -34,7 +31,7 @@ const TEST: (keyof MaxReps)[] = ['pullUps', 'dips', 'pushUps', 'muscleUps'];
 const SKILLS: Skill[] = ['handstand', 'lsit', 'frontLever', 'backLever', 'planche'];
 const EQUIPMENT: Equipment[] = ['bar', 'dips', 'parallettes', 'rings', 'bands', 'weights', 'tubes', 'none'];
 const INJURIES: Injury[] = ['shoulder', 'elbow', 'wrist', 'lowerBack', 'knee', 'other'];
-const SESSIONS: Profile['sessionMin'][] = [30, 45, 60, 90, 0];
+const SESSIONS: NonNullable<Profile['sessionMin']>[] = [30, 45, 60, 90, 0];
 const HOURS = Array.from({ length: 18 }, (_, i) => i + 5); // 5:00 to 22:00
 
 interface Draft {
@@ -53,6 +50,7 @@ interface Draft {
   unit: 'kg' | 'lb';
   weight?: number;
   sex?: 'male' | 'female';
+  details: GoalDetails;
   injuries: Injury[];
   injuryNote: string;
   reminders: boolean;
@@ -73,8 +71,9 @@ function draftFrom(p: Profile | null, lang: string): Draft {
     startPicked: !!p,
     age: p?.age,
     unit: lang === 'en' ? 'lb' : 'kg',
-    weight: p ? (lang === 'en' ? Math.round(p.weightKg * LB_PER_KG) : Math.round(p.weightKg)) : undefined,
+    weight: p?.weightKg != null ? (lang === 'en' ? Math.round(p.weightKg * LB_PER_KG) : Math.round(p.weightKg)) : undefined,
     sex: p?.sex,
+    details: p?.details ?? {},
     injuries: p?.injuries ?? [],
     injuryNote: p?.injuryNote ?? '',
     reminders: p?.reminders ?? true,
@@ -101,6 +100,8 @@ function stepDone(step: Step, d: Draft): boolean {
       return !!d.goal;
     case 'level':
       return !!level(d);
+    case 'details':
+      return detailsDone(d.goal, d.details);
     case 'equipment':
       return d.equipment.length > 0;
     case 'days':
@@ -128,11 +129,13 @@ function toProfile(d: Draft): Profile {
     skills: d.skills,
     equipment: d.equipment,
     trainingDays: [...d.trainingDays].sort((a, b) => a - b),
-    sessionMin: d.sessionMin!,
-    startDate: d.startDate!,
-    age: d.age!,
-    weightKg: weightKg(d)!,
+    // Asked only in the full questionnaire: kept when answered.
+    ...(d.sessionMin != null ? { sessionMin: d.sessionMin } : {}),
+    ...(d.startDate ? { startDate: d.startDate } : {}),
+    ...(d.age != null ? { age: d.age } : {}),
+    ...(weightKg(d) != null ? { weightKg: weightKg(d) } : {}),
     ...(d.sex ? { sex: d.sex } : {}),
+    ...(Object.keys(d.details).length ? { details: d.details } : {}),
     injuries: d.injuries,
     ...(d.injuries.length && d.injuryNote.trim() ? { injuryNote: d.injuryNote.trim() } : {}),
     reminders: d.reminders,
@@ -156,13 +159,22 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
   const { settings } = useApp();
   const { user, saveProfile, signOut } = useAuth();
   const [d, setD] = useState<Draft>(() => draftFrom(user?.profile ?? null, settings.language));
-  const [step, setStep] = useState<Step>(onClose && user?.profile ? 'review' : 'goal');
-  // Opened from the review to change one answer: Continue goes straight back to it.
-  const [fromReview, setFromReview] = useState(!!onClose && !!user?.profile);
+  const profile = user?.profile ?? null;
+  const isPro = user?.plan === 'pro';
+  const steps: readonly Step[] = isPro ? FULL_STEPS : SHORT_STEPS;
+  const questions = steps.length - 1;
+  // A Pro athlete whose profile came from the short questionnaire starts at the first missing answer.
+  const [step, setStep] = useState<Step>(() => {
+    if (!onClose || !profile) return steps[0];
+    if (isPro && !fullProfile(profile)) return steps.find((s) => s !== 'review' && !stepDone(s, d)) ?? 'review';
+    return 'review';
+  });
+  // Opened from the review (or to fill in what is missing): Continue goes to the next missing answer, then the review.
+  const [fromReview, setFromReview] = useState(!!onClose && !!profile);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<AuthError | null>(null);
 
-  const index = STEPS.indexOf(step);
+  const index = steps.indexOf(step);
   const set = (patch: Partial<Draft>) => {
     setD((prev) => ({ ...prev, ...patch }));
     setError(null);
@@ -170,14 +182,17 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
 
   const next = () => {
     if (!stepDone(step, d)) return;
-    if (step === 'days' && !d.startPicked) set({ startDate: nextTrainingDay(d.trainingDays) });
-    if (fromReview && stepDone('start', d)) setStep('review');
-    else setStep(STEPS[index + 1]);
+    const after = { ...d, ...(step === 'days' && !d.startPicked ? { startDate: nextTrainingDay(d.trainingDays) } : {}) };
+    if (after.startDate !== d.startDate) set({ startDate: after.startDate });
+    // Back to the review, unless a change left another answer missing (a new goal's questions).
+    const missing = steps.find((s) => s !== 'review' && !stepDone(s, after));
+    if (fromReview) setStep(missing ?? 'review');
+    else setStep(steps[index + 1]);
   };
 
   const back = () => {
     if (step === 'review' || index === 0) return onClose?.();
-    setStep(fromReview ? 'review' : STEPS[index - 1]);
+    setStep(fromReview ? 'review' : steps[index - 1]);
   };
 
   const save = async () => {
@@ -214,7 +229,7 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
 
   return (
     <Screen
-      title={step === 'review' ? t('onb.review.short') : t('onb.step', { n: index + 1, total: QUESTIONS })}
+      title={step === 'review' ? t('onb.review.short') : t('onb.step', { n: index + 1, total: questions })}
       onBack={canGoBack ? back : undefined}
       right={
         !onClose && index === 0 ? (
@@ -227,12 +242,12 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
       }
       footer={footer}
     >
-      {step !== 'review' ? <Progress value={(index + 1) / QUESTIONS} /> : null}
+      {step !== 'review' ? <Progress value={(index + 1) / questions} /> : null}
 
       {step === 'goal' && (
         <>
           <Txt variant="small" color={colors.muted} style={{ marginBottom: space.sm }}>
-            {t('onb.hello', { name: user?.name.split(' ')[0] ?? '' })}
+            {t('onb.hello', { name: user?.name.split(' ')[0] ?? '', n: questions })}
           </Txt>
           <Title text={t('onb.goal.title')} />
           <View style={{ gap: space.sm }}>
@@ -376,6 +391,8 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
         </>
       )}
 
+      {step === 'details' && d.goal ? <GoalDetailsStep goal={d.goal} details={d.details} onChange={(details) => set({ details })} /> : null}
+
       {step === 'body' && <BodyStep d={d} set={set} />}
 
       {step === 'injuries' && (
@@ -423,6 +440,8 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
       {step === 'review' && (
         <Review
           d={d}
+          steps={steps}
+          short={!isPro}
           edit={(s) => {
             setFromReview(true);
             setStep(s);
@@ -496,12 +515,12 @@ function BodyStep({ d, set }: { d: Draft; set: (p: Partial<Draft>) => void }) {
   );
 }
 
-function Review({ d, edit }: { d: Draft; edit: (s: Step) => void }) {
+function Review({ d, steps, short, edit }: { d: Draft; steps: readonly Step[]; short: boolean; edit: (s: Step) => void }) {
   const t = useT();
   const { settings } = useApp();
   const lvl = level(d);
   const days = [...d.trainingDays].sort((a, b) => a - b);
-  const rows: { step: Step; label: StringKey; value: string }[] = [
+  const all: { step: Step; label: StringKey; value: string }[] = [
     { step: 'goal', label: 'onb.review.goal', value: d.goal ? t(`onb.goal.${d.goal}`) : '–' },
     {
       step: 'level',
@@ -513,6 +532,7 @@ function Review({ d, edit }: { d: Draft; edit: (s: Step) => void }) {
         .filter(Boolean)
         .join(' · '),
     },
+    { step: 'details', label: 'onb.review.details', value: detailsSummary(d, t) },
     { step: 'equipment', label: 'onb.review.equipment', value: d.equipment.map((e) => t(`equipment.${e}`)).join(', ') },
     {
       step: 'days',
@@ -533,6 +553,7 @@ function Review({ d, edit }: { d: Draft; edit: (s: Step) => void }) {
     },
     { step: 'reminders', label: 'onb.review.reminders', value: d.reminders ? d.reminderTime : t('settings.off') },
   ];
+  const rows = all.filter((r) => steps.includes(r.step));
   return (
     <>
       <Title text={t('onb.review.title')} sub={t('onb.review.sub')} />
@@ -557,103 +578,53 @@ function Review({ d, edit }: { d: Draft; edit: (s: Step) => void }) {
       <Txt variant="small" color={colors.muted} style={{ marginTop: space.lg }}>
         {t('onb.review.coach')}
       </Txt>
+      {short ? (
+        <Txt variant="small" color={colors.accent} style={{ marginTop: space.sm }}>
+          {t('onb.review.shortNote')}
+        </Txt>
+      ) : null}
     </>
   );
 }
 
-// Month view for the start date. Past days can't be picked; training days are outlined.
-function Calendar({ value, trainingDays, onChange }: { value?: string; trainingDays: number[]; onChange: (iso: string) => void }) {
-  const t = useT();
-  const { settings } = useApp();
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const initial = value ? parseIsoDate(value) : today;
-  const [month, setMonth] = useState(new Date(initial.getFullYear(), initial.getMonth(), 1));
-  const thisMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-  const lastMonth = new Date(today.getFullYear(), today.getMonth() + 3, 1);
-
-  const first = weekday(month);
-  const daysInMonth = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
-  const cells: (Date | null)[] = [
-    ...Array<null>(first).fill(null),
-    ...Array.from({ length: daysInMonth }, (_, i) => new Date(month.getFullYear(), month.getMonth(), i + 1)),
-  ];
-  while (cells.length % 7) cells.push(null);
-  const weeks = Array.from({ length: cells.length / 7 }, (_, i) => cells.slice(i * 7, i * 7 + 7));
-
-  const shift = (n: number) => setMonth(new Date(month.getFullYear(), month.getMonth() + n, 1));
-  const label = month.toLocaleDateString(settings.language === 'en' ? 'en-US' : 'es-MX', { month: 'long', year: 'numeric' });
-  const title = label.charAt(0).toUpperCase() + label.slice(1);
-
-  return (
-    <Card style={{ padding: space.md }}>
-      <Row style={{ justifyContent: 'space-between', marginBottom: space.md }}>
-        <MonthArrow label="‹" a11y={t('onb.start.prev')} disabled={month <= thisMonth} onPress={() => shift(-1)} />
-        <Txt style={{ fontWeight: '800' }}>{title}</Txt>
-        <MonthArrow label="›" a11y={t('onb.start.next')} disabled={month >= lastMonth} onPress={() => shift(1)} />
-      </Row>
-      <Row gap={0}>
-        {[0, 1, 2, 3, 4, 5, 6].map((day) => (
-          <Txt key={day} variant="tiny" color={colors.muted} style={{ flex: 1, textAlign: 'center', fontWeight: '700' }}>
-            {t(`day.${day}` as StringKey)}
-          </Txt>
-        ))}
-      </Row>
-      {weeks.map((week, wi) => (
-        <Row key={wi} gap={0} style={{ marginTop: 4 }}>
-          {week.map((date, di) => {
-            if (!date) return <View key={di} style={{ flex: 1 }} />;
-            const iso = isoDate(date);
-            const past = date < today;
-            const selected = iso === value;
-            const training = trainingDays.includes(weekday(date));
-            return (
-              <View key={di} style={{ flex: 1, alignItems: 'center' }}>
-                <Pressable
-                  disabled={past}
-                  onPress={() => onChange(iso)}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected, disabled: past }}
-                  accessibilityLabel={iso}
-                  style={[
-                    styles.calDay,
-                    training && !past && { borderColor: colors.accent },
-                    selected && { backgroundColor: colors.accent, borderColor: colors.accent },
-                  ]}
-                >
-                  <Txt
-                    variant="small"
-                    style={{ fontWeight: training || selected ? '800' : '500' }}
-                    color={selected ? colors.accentText : past ? colors.faint : colors.text}
-                  >
-                    {date.getDate()}
-                  </Txt>
-                </Pressable>
-              </View>
-            );
-          })}
-        </Row>
-      ))}
-    </Card>
-  );
-}
-
-function MonthArrow({ label, a11y, disabled, onPress }: { label: string; a11y: string; disabled: boolean; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} disabled={disabled} hitSlop={8} accessibilityRole="button" accessibilityLabel={a11y} style={{ paddingHorizontal: 10 }}>
-      <Txt style={{ fontSize: 26, lineHeight: 28 }} color={disabled ? colors.faint : colors.text}>
-        {label}
-      </Txt>
-    </Pressable>
-  );
+// One line for the goal questions in the review.
+function detailsSummary(d: Draft, t: ReturnType<typeof useT>): string {
+  const x = d.details;
+  const parts: string[] = [];
+  switch (d.goal) {
+    case 'statics':
+      for (const [s, h] of Object.entries(x.statics?.holds ?? {})) {
+        parts.push(`${t(`skill.${s as Skill}`)} ${t(`stage.${STATIC_STAGES[s as Skill][h.stage]}` as StringKey).toLowerCase()} ${h.sec}s`);
+      }
+      break;
+    case 'endurance':
+      for (const k of ['squats', 'pistols', 'legRaises', 'hspu'] as const) {
+        const v = x.endurance?.[k];
+        if (v != null) parts.push(`${v} ${t(`onb.endurance.${k}`).toLowerCase()}`);
+      }
+      break;
+    case 'strength':
+      for (const [l, v] of Object.entries(x.strength?.lifts ?? {})) {
+        parts.push(`${t(`onb.lift.${l as keyof NonNullable<GoalDetails['strength']>['lifts']}`)} ${v.kg} kg × ${v.reps}`);
+      }
+      break;
+    case 'skills':
+      if (x.skills?.first) parts.push(t(`move.${x.skills.first}`));
+      if (x.skills?.stage) parts.push(t(`skillStage.${x.skills.stage}`).toLowerCase());
+      break;
+    case 'compete':
+      if (x.compete?.event) parts.push(x.compete.event);
+      if (x.compete?.date) parts.push(x.compete.date.split('-').reverse().join('/'));
+      break;
+    case 'fitness':
+      parts.push(...(x.fitness?.wants ?? []).map((w) => t(`want.${w}`)));
+      break;
+  }
+  return parts.join(' · ') || '–';
 }
 
 function sessionLabel(m: number, t: (k: StringKey) => string) {
   return m ? `${m} min` : t('onb.session.noCap');
-}
-
-function longDate(iso: string, lang: string) {
-  return parseIsoDate(iso).toLocaleDateString(lang === 'en' ? 'en-US' : 'es-MX', { weekday: 'long', day: 'numeric', month: 'long' });
 }
 
 // ---------- pieces ----------
@@ -663,46 +634,6 @@ function Progress({ value }: { value: number }) {
     <View style={{ height: 4, backgroundColor: colors.surface2, borderRadius: radius.pill, marginBottom: space.xl, overflow: 'hidden' }}>
       <View style={{ height: 4, width: `${Math.round(value * 100)}%`, backgroundColor: colors.accent, borderRadius: radius.pill }} />
     </View>
-  );
-}
-
-function Title({ text, sub }: { text: string; sub?: string }) {
-  return (
-    <View style={{ gap: 6, marginBottom: space.xl }}>
-      <Txt variant="title">{text}</Txt>
-      {sub ? <Txt color={colors.muted}>{sub}</Txt> : null}
-    </View>
-  );
-}
-
-function Option({ label, sub, active, onPress }: { label: string; sub?: string; active: boolean; onPress: () => void }) {
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="radio"
-      accessibilityState={{ checked: active }}
-      style={({ pressed }) => [styles.option, active && { borderColor: colors.accent, backgroundColor: colors.surface2 }, pressed && { opacity: 0.8 }]}
-    >
-      <View style={[styles.radio, active && { borderColor: colors.accent }]}>{active ? <View style={styles.radioDot} /> : null}</View>
-      <View style={{ flex: 1, gap: 2 }}>
-        <Txt style={{ fontWeight: '800', fontSize: 17 }}>{label}</Txt>
-        {sub ? (
-          <Txt variant="small" color={colors.muted}>
-            {sub}
-          </Txt>
-        ) : null}
-      </View>
-    </Pressable>
-  );
-}
-
-function LinkButton({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable onPress={onPress} hitSlop={8} accessibilityRole="button" style={{ alignSelf: 'center', marginTop: space.xl, padding: 6 }}>
-      <Txt variant="small" color={colors.accent} style={{ fontWeight: '700' }}>
-        {label}
-      </Txt>
-    </Pressable>
   );
 }
 
@@ -717,27 +648,6 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  calDay: {
-    width: 38,
-    height: 38,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: 'transparent',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  option: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: space.lg,
-  },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: colors.faint, alignItems: 'center', justifyContent: 'center' },
-  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: colors.accent },
   reviewRow: {
     flexDirection: 'row',
     alignItems: 'center',
