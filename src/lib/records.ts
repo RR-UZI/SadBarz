@@ -1,6 +1,6 @@
 // Records for the athlete profile: the best marks found in the workout log,
 // plus the stats on top of the profile.
-import type { Exercise, PersonalRecord, RecordUnit, Workout } from '../types';
+import type { Exercise, ForTimeScore, PersonalRecord, RecordUnit, Workout } from '../types';
 import { totalReps } from './blocks';
 import { clock, DAY_MS, startOfWeek } from './util';
 
@@ -59,6 +59,39 @@ export function amrapBests(workouts: Workout[]): AmrapBest[] {
       const { rounds, reps } = block.score;
       if (!cur || rounds > cur.rounds || (rounds === cur.rounds && reps > cur.reps)) {
         best.set(key, { key, name: block.title ? `${w.routineName} · ${block.title}` : w.routineName, rounds, reps, at: w.startedAt });
+      }
+    }
+  }
+  return [...best.values()].sort((a, b) => b.at - a.at);
+}
+
+// Best For time score of one block of one routine.
+export interface ForTimeBest {
+  key: string;
+  name: string;
+  score: ForTimeScore;
+  at: number;
+}
+
+// A finished For time beats a capped one; then the faster time, or more rounds and reps.
+function betterForTime(a: ForTimeScore, b: ForTimeScore): boolean {
+  if (a.timeSec != null || b.timeSec != null) {
+    if (b.timeSec == null) return true;
+    if (a.timeSec == null) return false;
+    return a.timeSec < b.timeSec;
+  }
+  return a.rounds > b.rounds || (a.rounds === b.rounds && (a.reps ?? 0) > (b.reps ?? 0));
+}
+
+export function forTimeBests(workouts: Workout[]): ForTimeBest[] {
+  const best = new Map<string, ForTimeBest>();
+  for (const w of oldestFirst(workouts)) {
+    for (const block of w.blocks) {
+      if (block.status !== 'done' || !block.forTime) continue;
+      const key = `${w.routineId ?? w.routineName}:${block.blockId}`;
+      const cur = best.get(key);
+      if (!cur || betterForTime(block.forTime, cur.score)) {
+        best.set(key, { key, name: block.title ? `${w.routineName} · ${block.title}` : w.routineName, score: block.forTime, at: w.startedAt });
       }
     }
   }

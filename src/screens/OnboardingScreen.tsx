@@ -8,6 +8,7 @@ import { useT, type StringKey } from '../i18n';
 import {
   LB_PER_KG,
   MAX_AGE,
+  MAX_TRAINING_DAYS,
   MAX_WEIGHT_KG,
   MIN_AGE,
   MIN_WEIGHT_KG,
@@ -27,7 +28,7 @@ const STEPS = ['goal', 'level', 'equipment', 'days', 'session', 'start', 'body',
 type Step = (typeof STEPS)[number];
 const QUESTIONS = STEPS.length - 1;
 
-const GOALS: Goal[] = ['endurance', 'skills', 'statics', 'fitness'];
+const GOALS: Goal[] = ['compete', 'endurance', 'strength', 'skills', 'statics', 'fitness'];
 const LEVELS: Level[] = ['beginner', 'intermediate', 'advanced'];
 const TEST: (keyof MaxReps)[] = ['pullUps', 'dips', 'pushUps', 'muscleUps'];
 const SKILLS: Skill[] = ['handstand', 'lsit', 'frontLever', 'backLever', 'planche'];
@@ -318,7 +319,9 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
               return (
                 <Pressable
                   key={day}
-                  onPress={() => set({ trainingDays: toggle(d.trainingDays, day) })}
+                  onPress={() => {
+                    if (active || d.trainingDays.length < MAX_TRAINING_DAYS) set({ trainingDays: toggle(d.trainingDays, day) });
+                  }}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: active }}
                   accessibilityLabel={t(`dayLong.${day}` as StringKey)}
@@ -333,6 +336,9 @@ export function OnboardingScreen({ onClose }: { onClose?: () => void }) {
           </Row>
           <Txt color={colors.accent} style={{ marginTop: space.lg, fontWeight: '700', textAlign: 'center' }}>
             {d.trainingDays.length === 1 ? t('onb.days.countOne') : d.trainingDays.length ? t('onb.days.count', { n: d.trainingDays.length }) : ' '}
+          </Txt>
+          <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm, textAlign: 'center' }}>
+            {t('onb.days.max', { n: MAX_TRAINING_DAYS })}
           </Txt>
         </>
       )}

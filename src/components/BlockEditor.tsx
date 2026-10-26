@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { blockDurationSec, DEFAULT_AMRAP_SEC, itemTurns, newItem, newRow } from '../lib/blocks';
+import { blockDurationSec, DEFAULT_AMRAP_SEC, DEFAULT_FORTIME_SEC, itemTurns, newItem, newRow } from '../lib/blocks';
 import { clock, shortDuration } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
@@ -34,6 +34,10 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
     }
     if (format === 'tabata' && block.format !== 'tabata') patch.rounds = 8;
     if (format === 'amrap' && !block.capSec) patch.capSec = DEFAULT_AMRAP_SEC;
+    if (format === 'fortime') {
+      if (!block.capSec) patch.capSec = DEFAULT_FORTIME_SEC;
+      if (block.format !== 'fortime') patch.rounds = 1;
+    }
     set(patch);
   };
 
@@ -48,7 +52,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
   const removeItem = (list: BlockItem[], id: string) => list.filter((x) => x.id !== id);
   const updateRow = (row: SetRow) => set({ rows: block.rows.map((r) => (r.id === row.id ? row : r)) });
 
-  const formats: BlockFormat[] = ['emom', 'tabata', 'sets', 'circuit', 'amrap'];
+  const formats: BlockFormat[] = ['emom', 'tabata', 'sets', 'circuit', 'amrap', 'fortime'];
   const dur = blockDurationSec(block);
 
   return (
@@ -102,7 +106,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
         </Row>
       )}
 
-      {block.format === 'amrap' && (
+      {(block.format === 'amrap' || block.format === 'fortime') && (
         <View style={{ gap: space.md }}>
           <Txt variant="small" color={colors.muted}>
             {t('block.timeCap')}
@@ -112,7 +116,10 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
               <Chip key={m} label={`${m} min`} active={dur === m * 60} onPress={() => set({ capSec: m * 60 })} />
             ))}
           </Row>
-          <NumberField label={t('timers.minutes')} value={Math.round(dur / 60)} min={1} max={120} onChange={(v) => set({ capSec: (v ?? 10) * 60 })} />
+          <Row gap={space.lg} style={{ flexWrap: 'wrap' }}>
+            <NumberField label={block.format === 'fortime' ? t('block.cap') : t('timers.minutes')} value={Math.round(dur / 60)} min={1} max={120} onChange={(v) => set({ capSec: (v ?? 10) * 60 })} />
+            {block.format === 'fortime' ? <NumberField label={t('block.rounds')} value={block.rounds} min={1} max={50} onChange={(v) => set({ rounds: v ?? 1 })} /> : null}
+          </Row>
         </View>
       )}
 
