@@ -70,7 +70,10 @@ export function BlockSummary({ block, index, names }: { block: Block; index?: nu
       ? block.rows.map(
           (r) =>
             `${r.sets}x  ${r.items
-              .map((it) => `${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${it.weightKg ? ` +${it.weightKg}kg` : ''}`)
+              .map(
+                (it) =>
+                  `${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${it.weightKg ? ` +${it.weightKg}kg` : ''}${it.note ? ` (${it.note})` : ''}`,
+              )
               .join('  +  ')}${r.restSec ? `   ·  ${t('block.rest').toLowerCase()} ${r.restSec}"` : ''}`,
         )
       : block.items.map(
