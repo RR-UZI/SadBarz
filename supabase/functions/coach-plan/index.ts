@@ -340,7 +340,6 @@ function serverKey(): string {
   return keys.default ?? Object.values(keys)[0];
 }
 const db = createClient(Deno.env.get('SUPABASE_URL')!, serverKey(), { auth: { persistSession: false } });
-const claude = new Anthropic(); // reads ANTHROPIC_API_KEY
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
@@ -392,7 +391,7 @@ Deno.serve(async (req) => {
     .insert({ user_id: user.id, status: 'writing', weeks, start_date: startDate, input, model: MODEL })
     .select('id')
     .single();
-  if (insertError || !created) return json({ error: 'save' }, 500);
+  if (insertError || !created) return json({ error: 'save', detail: insertError?.message }, 500);
 
   // Writing takes a minute or two; the app checks back with my_coach_plan_status().
   EdgeRuntime.waitUntil(writePlan(created.id, input, trainingDays, exercises));
@@ -402,6 +401,8 @@ Deno.serve(async (req) => {
 async function writePlan(planId: string, input: ReturnType<typeof athleteInput>, trainingDays: number[], exercises: Exercise[]) {
   const finish = (fields: Record<string, unknown>) => db.from('coach_plans').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', planId);
   try {
+    // Made here, not at start-up, so a missing ANTHROPIC_API_KEY shows up as this plan's error.
+    const claude = new Anthropic(); // reads ANTHROPIC_API_KEY
     const message = await claude.beta.messages
       .stream({
         model: MODEL,

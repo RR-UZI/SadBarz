@@ -41,7 +41,9 @@ export async function coachStatus(): Promise<CoachPlanStatus | null> {
   return row ? { id: row.id, status: row.status, weeks: row.weeks, startDate: row.start_date, createdAt: row.created_at } : null;
 }
 
-export async function askForPlan(weeks: PlanWeeks, exercises: Exercise[], language: Language): Promise<{ ok: true } | { ok: false; error: AskError }> {
+export type AskResult = { ok: true } | { ok: false; error: AskError; detail: string };
+
+export async function askForPlan(weeks: PlanWeeks, exercises: Exercise[], language: Language): Promise<AskResult> {
   const body = { weeks, today: isoDay(Date.now()), language, exercises: exercises.map(({ id, name, kind, category }) => ({ id, name, kind, category })) };
   if (!supabase) {
     const status: CoachPlanStatus = { id: 'preview', status: 'review', weeks, startDate: body.today, createdAt: new Date().toISOString() };
@@ -50,8 +52,26 @@ export async function askForPlan(weeks: PlanWeeks, exercises: Exercise[], langua
   }
   const { error } = await supabase.functions.invoke('coach-plan', { body });
   if (!error) return { ok: true };
-  // The function answers { error: 'limit' | 'profile' | 'pro' | ... } with the status code.
+  // The function answers { error: 'limit' | 'profile' | 'pro' | ..., detail? } with the status code.
+  // Anything else (the gateway refusing the call, no network) keeps its own message for the admin view.
   const res = (error as { context?: Response }).context;
-  const code = res && typeof res.json === 'function' ? ((await res.json().catch(() => ({}))) as { error?: string }).error : undefined;
-  return { ok: false, error: code === 'limit' || code === 'profile' || code === 'pro' ? code : 'failed' };
+  let answer: { error?: string; detail?: string; message?: string; msg?: string } = {};
+  if (res && typeof res.text === 'function') {
+    const raw = await res.text().catch(() => '');
+    try {
+      answer = JSON.parse(raw);
+    } catch {
+      answer = { message: raw.slice(0, 200) };
+    }
+  }
+  const code = answer.error;
+  const detail = [res?.status, code, answer.detail ?? answer.message ?? answer.msg ?? (res ? undefined : error.message)].filter(Boolean).join(' · ');
+  return { ok: false, error: code === 'limit' || code === 'profile' || code === 'pro' ? code : 'failed', detail };
+}
+
+/** Admins only (row level security): why a plan failed, as the server saved it. */
+export async function planError(id: string): Promise<string | null> {
+  if (!supabase) return null;
+  const { data } = await supabase.from('coach_plans').select('error').eq('id', id).maybeSingle();
+  return (data as { error: string | null } | null)?.error ?? null;
 }

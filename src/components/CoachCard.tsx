@@ -4,8 +4,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { askForPlan, coachStatus, isWaiting, PLAN_WEEKS, type AskError, type CoachPlanStatus, type PlanWeeks } from '../lib/coach';
+import { askForPlan, coachStatus, isWaiting, planError, PLAN_WEEKS, type AskError, type CoachPlanStatus, type PlanWeeks } from '../lib/coach';
 import { useApp } from '../store/AppStore';
+import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
 import { Button, Card, Segmented, Txt } from './ui';
 
@@ -24,6 +25,9 @@ export function CoachCard() {
   const [weeks, setWeeks] = useState<PlanWeeks>(1);
   const [asking, setAsking] = useState(false);
   const [error, setError] = useState<AskError | null>(null);
+  // Admins also see the server's own words, to find what went wrong.
+  const { user } = useAuth();
+  const [detail, setDetail] = useState<string | null>(null);
 
   const refresh = useCallback(() => {
     coachStatus()
@@ -31,6 +35,9 @@ export function CoachCard() {
       .catch(() => setStatus((s) => s ?? null));
   }, []);
   useEffect(refresh, [refresh]);
+  useEffect(() => {
+    if (user?.admin && status?.status === 'failed' && !error) planError(status.id).then((e) => e && setDetail(e));
+  }, [user?.admin, status?.status, status?.id, error]);
   // While the coach writes or Uzi reviews, check back now and then.
   useEffect(() => {
     if (!isWaiting(status?.status)) return;
@@ -41,9 +48,13 @@ export function CoachCard() {
   const ask = async () => {
     setAsking(true);
     setError(null);
+    setDetail(null);
     const res = await askForPlan(weeks, exercises, settings.language);
     setAsking(false);
-    if (!res.ok) setError(res.error);
+    if (!res.ok) {
+      setError(res.error);
+      setDetail(res.detail);
+    }
     refresh();
   };
 
@@ -89,6 +100,11 @@ export function CoachCard() {
       {error || status?.status === 'failed' ? (
         <Txt variant="small" color={colors.danger} style={{ marginTop: space.sm }}>
           {t(ERRORS[error ?? 'failed'])}
+        </Txt>
+      ) : null}
+      {user?.admin && detail && (error || status?.status === 'failed') ? (
+        <Txt variant="tiny" color={colors.muted} style={{ marginTop: space.xs }}>
+          {detail}
         </Txt>
       ) : null}
       <Button
