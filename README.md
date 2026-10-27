@@ -16,6 +16,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
 - **Athlete profile** (every plan): tap the photo on Home, or the account card in Settings. Profile photo (cut to a square and shrunk to 256 px, saved with the user's data so every device shows it; tapping it shows it big, only "Cambiar foto" changes it), stats (workouts, hours, reps, weeks in a row), personal records added by hand (max reps, hold seconds, added weight, or finish time of a test), and best marks read from the workout log (most reps in a set, longest hold, heaviest added weight, best AMRAP score, best For time). Tapping a logged mark saves it as a PR.
 - **Onboarding**: after the first sign in, the questions for the coach, one per screen, then a review. Free accounts answer the short version (goal: compete, endurance, strength, skills, statics or get fit; max reps test or level; equipment; training days, up to 6 so there is always a rest day). Pro answers the full version: the same plus a goal page (statics: hardest stage and seconds held; endurance: more max reps; strength: added weight and reps; skills: skills they have, the next one and where they are with it; compete: which competition, date, category, format, last result, weakest move; get fit: what they want, time off, a quick test, other sports, daily activity, goal weight), session length, start date, age and weight, injuries and reminders. A Pro athlete whose profile came from the short version gets a "Completar preguntas" card on Home that asks only what is missing. Answers can be changed in Settings.
+- **AI coach (Pro, first part)**: ask for a plan of 1 week, 2 weeks or 1 month; the coach writes it and it waits for Uzi's review (see AI coach below).
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
 
@@ -63,6 +64,18 @@ update auth.users set raw_app_meta_data = raw_app_meta_data || '{"admin":true}':
 
 In Supabase, **Authentication → URL Configuration** must list the site address (the Vercel URL, and `http://localhost:8081` for local work) so confirmation and password reset links come back to the app.
 
+## AI coach (Pro)
+
+A Pro athlete with a complete profile picks a plan length on Home (1 week, 2 weeks or 1 month) and taps **Pedir mi plan**. The Supabase Edge Function `coach-plan` (`supabase/functions/coach-plan/index.ts`) checks the account is Pro (or admin), reads the profile, the last 4 weeks of workouts, the records and the last approved plan, and asks Claude (`claude-opus-5-5`, structured JSON output) for one week of routines in the app's routine format, following Uzi's method (the `METHOD` text at the top of that file; edit it to change how the coach writes). The plan is saved in the table `coach_plans` with status `review`; until Uzi approves it the athlete sees "Tu coach está revisando tu plan". One plan at a time, at most 3 requests a day per athlete. In the preview build the request is only kept on the device.
+
+Setup, once:
+
+1. Run `supabase/migrations/20261027000000_coach_plans.sql` in the SQL Editor.
+2. **Edge Functions → Secrets**: `ANTHROPIC_API_KEY` (never in the app or the repo).
+3. **Edge Functions → Deploy a new function → Via Editor**, name it `coach-plan`, paste `supabase/functions/coach-plan/index.ts`, deploy. The function checks the athlete's session itself, so if every call fails with "Invalid JWT" (projects on the new signing keys), turn "Verify JWT" off for it. With the Supabase CLI instead: `supabase functions deploy coach-plan`.
+
+Check it locally with `deno check supabase/functions/coach-plan/index.ts` (the app's `tsc` skips that folder).
+
 ## Deploy the web app (Vercel)
 
 `vercel.json` already has the settings. In Vercel: **Add New → Project → Import** `RR-UZI/SadBarz`, keep the defaults, **Deploy**. Every push to `main` then publishes a new version, and every pull request gets its own preview link.
@@ -76,6 +89,8 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 | `src/lib/sync.ts` | Per-user cloud copy: pull, merge, push |
 | `src/lib/records.ts`, `src/lib/avatar.ts`, `src/screens/ProfileScreen.tsx` | Athlete profile: stats, logged bests, PRs, profile photo |
 | `supabase/migrations/` | SQL for the Supabase tables |
+| `supabase/functions/coach-plan/` | The AI coach: writes a plan with Claude and saves it for Uzi's review |
+| `src/lib/coach.ts`, `src/components/CoachCard.tsx` | Asking for a plan and its status on Home |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
 | `src/store/AppStore.tsx` | App state per user: device copy plus cloud sync |
 | `src/data/seed.ts` | Exercise library and example routines |

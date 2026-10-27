@@ -2,6 +2,7 @@ import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
+import { CoachCard } from '../components/CoachCard';
 import { Badge, Button, Card, Row, Screen, Section, Txt } from '../components/ui';
 import { WEEK_ROUTINE_IDS } from '../data/seed';
 import { useT } from '../i18n';
@@ -110,17 +111,23 @@ export function HomeScreen() {
       </Section>
 
       <Section title={t('home.coachTitle')} right={<Badge label="PRO" color={colors.accent} textColor={colors.accentText} />}>
-        <Card style={{ borderColor: colors.faint, borderStyle: 'dashed' }}>
-          <Txt>{proMissing ? t('home.completePro') : user?.profile ? t('home.coachReady') : t('home.coachBody')}</Txt>
-          <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm }}>
-            {t('home.soon')}
-          </Txt>
-          {proMissing ? (
-            <Button label={t('home.completeProButton')} size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
-          ) : user?.profile ? (
-            <Button label={t('home.viewProfile')} variant="ghost" size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
-          ) : null}
-        </Card>
+        {user?.plan === 'pro' && user.profile && !proMissing ? (
+          <CoachCard />
+        ) : (
+          <Card style={{ borderColor: colors.faint, borderStyle: 'dashed' }}>
+            <Txt>{proMissing ? t('home.completePro') : user?.profile ? t('home.coachReady') : t('home.coachBody')}</Txt>
+            {user?.plan !== 'pro' ? (
+              <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm }}>
+                {t('home.soon')}
+              </Txt>
+            ) : null}
+            {proMissing ? (
+              <Button label={t('home.completeProButton')} size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
+            ) : user?.profile ? (
+              <Button label={t('home.viewProfile')} variant="ghost" size="sm" style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'editProfile' })} />
+            ) : null}
+          </Card>
+        )}
       </Section>
 
       <Txt variant="tiny" color={colors.faint} style={{ textAlign: 'center', marginTop: space.xl }}>
