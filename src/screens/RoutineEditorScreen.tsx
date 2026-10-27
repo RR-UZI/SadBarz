@@ -13,11 +13,12 @@ import { colors, space } from '../theme';
 import type { Block, Routine } from '../types';
 import { BlockSummary } from './RoutinesScreen';
 
-export function RoutineEditorScreen({ id }: { id?: string }) {
+// With draft + onSave it edits a routine the app doesn't keep (a coach plan's day) and hands it back.
+export function RoutineEditorScreen({ id, draft: given, onSave }: { id?: string; draft?: Routine; onSave?: (r: Routine) => void }) {
   const t = useT();
   const nav = useNav();
   const { routines, saveRoutine } = useApp();
-  const existing = id ? routines.find((r) => r.id === id) : undefined;
+  const existing = given ?? (id ? routines.find((r) => r.id === id) : undefined);
 
   const [draft, setDraft] = useState<Routine>(
     () =>
@@ -43,6 +44,10 @@ export function RoutineEditorScreen({ id }: { id?: string }) {
     });
 
   const save = () => {
+    if (onSave) {
+      onSave({ ...draft, name: draft.name.trim() || t('routines.untitled'), updatedAt: Date.now() });
+      return nav.pop();
+    }
     // A new routine past the free limit (e.g. one added on another device meanwhile) isn't saved.
     if (!existing && !limit.canAdd) return showPro('routineLimit');
     saveRoutine({ ...draft, name: draft.name.trim() || t('routines.untitled') });

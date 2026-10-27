@@ -68,6 +68,10 @@ In Supabase, **Authentication → URL Configuration** must list the site address
 
 A Pro athlete with a complete profile picks a plan length on Home (1 week, 2 weeks or 1 month) and taps **Pedir mi plan**. The Supabase Edge Function `coach-plan` (`supabase/functions/coach-plan/index.ts`) checks the account is Pro (or admin), reads the profile, the last 4 weeks of workouts, the records and the last approved plan, and asks Claude (`claude-opus-5-5`, structured JSON output) for one week of routines in the app's routine format, following Uzi's method (the `METHOD` text at the top of that file; edit it to change how the coach writes). The plan is saved in the table `coach_plans` with status `review`; until Uzi approves it the athlete sees "Tu coach está revisando tu plan". One plan at a time, at most 3 requests a day per athlete. In the preview build the request is only kept on the device.
 
+**Uzi's review.** Admin accounts get a "Planes por revisar" card on Home (real accounts only, not the preview build). The list shows plans waiting for review, oldest first, then the latest reviewed. A plan shows the athlete's answers, max reps, injuries and how much they trained, the coach's summary and progression, and each day's routine. Uzi can:
+- **Aprobar**: the athlete can see it. If he edited any day first (Editar opens the normal routine editor), his version is saved apart in `approved_plan`, so the original stays to compare.
+- **Devolver con nota**: the function rewrites the same plan following the note, keeping the old version and the note in the plan's history. The coach also reads Uzi's latest notes on every new plan, so it keeps applying what he corrects.
+
 Setup, once:
 
 1. Run `supabase/migrations/20261027000000_coach_plans.sql` in the SQL Editor.
@@ -91,6 +95,7 @@ Check it locally with `deno check supabase/functions/coach-plan/index.ts` (the a
 | `supabase/migrations/` | SQL for the Supabase tables |
 | `supabase/functions/coach-plan/` | The AI coach: writes a plan with Claude and saves it for Uzi's review |
 | `src/lib/coach.ts`, `src/components/CoachCard.tsx` | Asking for a plan and its status on Home |
+| `src/screens/CoachReviewScreen.tsx` | Uzi's review: plans waiting, approve, edit, send back with a note |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
 | `src/store/AppStore.tsx` | App state per user: device copy plus cloud sync |
 | `src/data/seed.ts` | Exercise library and example routines |

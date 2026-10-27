@@ -6,6 +6,8 @@
 //   with the athlete's session (supabase.functions.invoke sends it).
 //   -> 202 { id, status: 'writing' }  the coach started; the row turns 'review' (or 'failed') when done
 //   -> 200 { id, status }             a plan is already being written or reviewed, nothing new started
+// POST { rewrite: planId, note, exercises } (admins only): Uzi sends a plan back with a note;
+//   the coach writes it again following the note -> 202 { id, status: 'writing' }
 //
 // Secrets: ANTHROPIC_API_KEY (added by Uzi in Supabase > Edge Functions > Secrets).
 // SUPABASE_URL and the server key (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS) are provided by Supabase itself.
@@ -323,6 +325,28 @@ function athleteInput(profile: Record<string, unknown>, synced: Synced, lastPlan
   };
 }
 
+// What a plan row keeps in `input`: what the coach read, plus what is needed to write it again.
+type Stored = ReturnType<typeof athleteInput> & {
+  athlete?: { name?: string };
+  trainingDays?: number[];
+  exercises?: Exercise[];
+  /** Earlier versions Uzi sent back, oldest first. */
+  revisions?: { plan: unknown; note: string; at: string }[];
+};
+
+/** The part of the stored input Claude reads about the athlete. */
+function aboutAthlete(input: Stored) {
+  const { athlete: _a, trainingDays: _t, exercises: _e, revisions: _r, ...rest } = input;
+  return rest;
+}
+
+function cleanExercises(list: unknown): Exercise[] {
+  return (Array.isArray(list) ? list : [])
+    .filter((e: Exercise) => e && typeof e.id === 'string' && typeof e.name === 'string' && ['reps', 'hold', 'distance', 'calories'].includes(e.kind))
+    .slice(0, 400)
+    .map((e: Exercise) => ({ id: e.id.slice(0, 80), name: e.name.slice(0, 80), kind: e.kind, category: String(e.category).slice(0, 20) }));
+}
+
 // ---------- The request ----------
 
 const cors = {
@@ -354,14 +378,15 @@ Deno.serve(async (req) => {
   if (user.app_metadata?.plan !== 'pro' && !isAdmin) return json({ error: 'pro' }, 403);
 
   const body = await req.json().catch(() => ({}));
+  if (typeof body.rewrite === 'string') {
+    if (!isAdmin) return json({ error: 'admin' }, 403);
+    return rewrite(body.rewrite, String(body.note ?? '').trim().slice(0, 2000), cleanExercises(body.exercises), user.id);
+  }
   const weeks = Number(body.weeks);
   if (!PLAN_LENGTHS.includes(weeks)) return json({ error: 'weeks' }, 400);
   const today = /^\d{4}-\d{2}-\d{2}$/.test(body.today) ? body.today : day(Date.now());
   const language = body.language === 'en' ? 'en' : 'es';
-  const exercises: Exercise[] = (Array.isArray(body.exercises) ? body.exercises : [])
-    .filter((e: Exercise) => e && typeof e.id === 'string' && typeof e.name === 'string' && ['reps', 'hold', 'distance', 'calories'].includes(e.kind))
-    .slice(0, 400)
-    .map((e: Exercise) => ({ id: e.id.slice(0, 80), name: e.name.slice(0, 80), kind: e.kind, category: String(e.category).slice(0, 20) }));
+  const exercises = cleanExercises(body.exercises);
   if (exercises.length < 5) return json({ error: 'exercises' }, 400);
 
   const profile = user.user_metadata?.profile as Record<string, unknown> | undefined;
@@ -369,9 +394,9 @@ Deno.serve(async (req) => {
   if (!profile?.goal || !trainingDays.length) return json({ error: 'profile' }, 400);
 
   // One plan at a time: if one is being written or reviewed, that's the answer.
-  const { data: latest } = await db.from('coach_plans').select('id, status, created_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const { data: latest } = await db.from('coach_plans').select('id, status, updated_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (latest && ['writing', 'review', 'returned'].includes(latest.status)) {
-    const stuck = latest.status === 'writing' && Date.now() - new Date(latest.created_at).getTime() > STUCK_AFTER_MS;
+    const stuck = latest.status === 'writing' && Date.now() - new Date(latest.updated_at).getTime() > STUCK_AFTER_MS;
     if (!stuck) return json({ id: latest.id, status: latest.status });
     await db.from('coach_plans').update({ status: 'failed', error: 'timed out', updated_at: new Date().toISOString() }).eq('id', latest.id);
   }
@@ -384,7 +409,13 @@ Deno.serve(async (req) => {
   const { data: lastApproved } = await db.from('coach_plans').select('weeks, start_date, plan, approved_plan').eq('user_id', user.id).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
   const lastPlan = lastApproved ? { weeks: lastApproved.weeks, startDate: lastApproved.start_date, ...(lastApproved.approved_plan ?? lastApproved.plan) } : null;
   const startDate = typeof profile.startDate === 'string' && profile.startDate > today ? profile.startDate : today;
-  const input = athleteInput(profile, (row?.data ?? {}) as Synced, lastPlan, weeks, today, startDate, language);
+  const name = typeof user.user_metadata?.name === 'string' ? user.user_metadata.name.slice(0, 80) : undefined;
+  const input: Stored = {
+    ...athleteInput(profile, (row?.data ?? {}) as Synced, lastPlan, weeks, today, startDate, language),
+    athlete: { name },
+    trainingDays,
+    exercises,
+  };
 
   const { data: created, error: insertError } = await db
     .from('coach_plans')
@@ -398,11 +429,41 @@ Deno.serve(async (req) => {
   return json({ id: created.id, status: 'writing' }, 202);
 });
 
-async function writePlan(planId: string, input: ReturnType<typeof athleteInput>, trainingDays: number[], exercises: Exercise[]) {
+// Uzi sent a plan back: keep the old version and his note, and write it again.
+async function rewrite(planId: string, note: string, fallbackExercises: Exercise[], reviewer: string) {
+  if (!note) return json({ error: 'note' }, 400);
+  const { data: row } = await db.from('coach_plans').select('id, status, input, plan').eq('id', planId).maybeSingle();
+  if (!row) return json({ error: 'missing' }, 404);
+  if (!['review', 'returned', 'failed'].includes(row.status)) return json({ error: 'status', detail: row.status }, 409);
+  const input = row.input as Stored;
+  const trainingDays = input.trainingDays ?? (Array.isArray(input.profile?.trainingDays) ? (input.profile.trainingDays as number[]) : []);
+  const exercises = input.exercises?.length ? input.exercises : fallbackExercises;
+  if (!trainingDays.length || exercises.length < 5) return json({ error: 'input' }, 400);
+  const now = new Date().toISOString();
+  const revisions = [...(input.revisions ?? []), ...(row.plan ? [{ plan: row.plan, note, at: now }] : [])];
+  const next: Stored = { ...input, trainingDays, exercises, revisions };
+  const { error } = await db
+    .from('coach_plans')
+    .update({ status: 'writing', input: next, review_note: note, reviewed_by: reviewer, reviewed_at: now, error: null, updated_at: now })
+    .eq('id', planId);
+  if (error) return json({ error: 'save', detail: error.message }, 500);
+  EdgeRuntime.waitUntil(writePlan(planId, next, trainingDays, exercises));
+  return json({ id: planId, status: 'writing' }, 202);
+}
+
+// Uzi's latest notes on any athlete's plan, so every plan follows what he keeps correcting.
+async function pastNotes(): Promise<string[]> {
+  const { data } = await db.from('coach_plans').select('review_note').not('review_note', 'is', null).order('reviewed_at', { ascending: false }).limit(15);
+  return (data ?? []).map((r: { review_note: string }) => r.review_note).filter(Boolean);
+}
+
+async function writePlan(planId: string, input: Stored, trainingDays: number[], exercises: Exercise[]) {
   const finish = (fields: Record<string, unknown>) => db.from('coach_plans').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', planId);
   try {
     // Made here, not at start-up, so a missing ANTHROPIC_API_KEY shows up as this plan's error.
     const claude = new Anthropic(); // reads ANTHROPIC_API_KEY
+    const last = input.revisions?.[input.revisions.length - 1];
+    const notes = (await pastNotes()).filter((n) => n !== last?.note);
     const message = await claude.beta.messages
       .stream({
         model: MODEL,
@@ -417,7 +478,18 @@ async function writePlan(planId: string, input: ReturnType<typeof athleteInput>,
             role: 'user',
             content: [
               { type: 'text', text: `The athlete's exercise list (use only these ids):\n${JSON.stringify(exercises)}` },
-              { type: 'text', text: `The athlete:\n${JSON.stringify(input)}` },
+              { type: 'text', text: `The athlete:\n${JSON.stringify(aboutAthlete(input))}` },
+              ...(notes.length
+                ? [{ type: 'text' as const, text: `Uzi's recent corrections on plans you wrote (for any athlete). Keep following them where they apply:\n${notes.map((n) => `- ${n}`).join('\n')}` }]
+                : []),
+              ...(last
+                ? [
+                    {
+                      type: 'text' as const,
+                      text: `Uzi reviewed your previous version of this plan and sent it back with this note:\n"${last.note}"\n\nThe version he sent back:\n${JSON.stringify(last.plan)}\n\nWrite a new version that does what his note asks and keeps what he didn't object to. Say in the summary what you changed.`,
+                    },
+                  ]
+                : []),
               {
                 type: 'text',
                 text: `Write one week for this athlete: one routine for each training day (${trainingDays.join(', ')}). It repeats for ${input.planWeeks} week(s) starting ${input.planStarts}. Write the routines in ${input.language === 'en' ? 'English' : 'Spanish'}; the summary for Uzi in Spanish.`,

@@ -532,7 +532,7 @@ function Review({ d, steps, short, edit }: { d: Draft; steps: readonly Step[]; s
         .filter(Boolean)
         .join(' · '),
     },
-    { step: 'details', label: 'onb.review.details', value: detailsSummary(d, t) },
+    { step: 'details', label: 'onb.review.details', value: detailsSummary(d.goal, d.details, t) },
     { step: 'equipment', label: 'onb.review.equipment', value: d.equipment.map((e) => t(`equipment.${e}`)).join(', ') },
     {
       step: 'days',
@@ -587,11 +587,10 @@ function Review({ d, steps, short, edit }: { d: Draft; steps: readonly Step[]; s
   );
 }
 
-// One line for the goal questions in the review.
-function detailsSummary(d: Draft, t: ReturnType<typeof useT>): string {
-  const x = d.details;
+// One line for the goal questions (onboarding review, and Uzi's plan review).
+export function detailsSummary(goal: Goal | undefined, x: GoalDetails, t: ReturnType<typeof useT>): string {
   const parts: string[] = [];
-  switch (d.goal) {
+  switch (goal) {
     case 'statics':
       for (const [s, h] of Object.entries(x.statics?.holds ?? {})) {
         parts.push(`${t(`skill.${s as Skill}`)} ${t(`stage.${STATIC_STAGES[s as Skill][h.stage]}` as StringKey).toLowerCase()} ${h.sec}s`);
