@@ -55,6 +55,12 @@ The onboarding answers are saved in the account's user metadata under `profile` 
 update auth.users set raw_app_meta_data = raw_app_meta_data || '{"plan":"pro"}'::jsonb where email = 'their@email.com';
 ```
 
+**Admin Free/Pro switch.** An account whose app_metadata has `"admin": true` sees a FREE/PRO pill on Home (and a "Ver la app como" switch in Settings) that flips what the app shows, to try both plans. It only changes the view on that device (`sadbarz:plan-view`), never the real plan, and no other account sees it. In the preview build every account has it. To make the owner's account admin:
+
+```sql
+update auth.users set raw_app_meta_data = raw_app_meta_data || '{"admin":true}'::jsonb where email = 'owner@email.com';
+```
+
 In Supabase, **Authentication → URL Configuration** must list the site address (the Vercel URL, and `http://localhost:8081` for local work) so confirmation and password reset links come back to the app.
 
 ## Deploy the web app (Vercel)

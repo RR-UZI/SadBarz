@@ -17,7 +17,7 @@ import { WorkoutCard } from './HistoryScreen';
 export function HomeScreen() {
   const t = useT();
   const { routines, workouts, avatar } = useApp();
-  const { user } = useAuth();
+  const { user, setPlanView } = useAuth();
   const proMissing = user?.plan === 'pro' && !!user.profile && !fullProfile(user.profile);
   const nav = useNav();
 
@@ -33,6 +33,20 @@ export function HomeScreen() {
     <Screen
       right={
         <Row gap={space.xs}>
+          {user?.admin ? (
+            // Admin only: one tap flips the app between Free and Pro to try both.
+            <Pressable
+              onPress={() => setPlanView(user.plan === 'pro' ? 'free' : 'pro')}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel={t('settings.planView')}
+              style={{ paddingHorizontal: 10, paddingVertical: 4, borderRadius: 999, borderWidth: 1, borderColor: colors.accent, backgroundColor: user.plan === 'pro' ? colors.accent : 'transparent' }}
+            >
+              <Text style={{ color: user.plan === 'pro' ? colors.accentText : colors.accent, fontWeight: '800', fontSize: 12 }}>
+                {user.plan === 'pro' ? 'PRO' : t('settings.planViewFree').toUpperCase()}
+              </Text>
+            </Pressable>
+          ) : null}
           <Pressable onPress={() => nav.push({ name: 'settings' })} hitSlop={10} accessibilityLabel={t('settings.title')} style={{ padding: 6 }}>
             <Text style={{ color: colors.muted, fontSize: 24 }}>⚙</Text>
           </Pressable>

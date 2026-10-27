@@ -557,6 +557,9 @@ export const es = {
   'settings.plan': 'Plan',
   'settings.planFree': 'Gratis · hasta {n} rutinas propias',
   'settings.planPro': 'Pro',
+  'settings.planView': 'Ver la app como',
+  'settings.planViewFree': 'Gratis',
+  'settings.planViewHelp': 'Solo tu cuenta de admin ve este botón. Cambia lo que ves en este dispositivo para probar Gratis y Pro; no cambia tu plan real.',
   'settings.seePro': 'Ver Pro',
 
   'profile.title': 'Mi perfil',

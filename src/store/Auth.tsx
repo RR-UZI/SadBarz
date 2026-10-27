@@ -15,7 +15,10 @@ export interface Account {
   name: string;
   /** Onboarding answers; null until onboarding is finished. */
   profile: Profile | null;
+  /** The plan the app shows. For an admin it can be switched by hand to try the other one. */
   plan: Plan;
+  /** Uzi's account: `admin: true` in app_metadata, which only the server can set. Sees the Free/Pro switch. */
+  admin: boolean;
 }
 
 // Each maps to an 'auth.error.*' string.
@@ -57,6 +60,8 @@ interface AuthValue {
   saveProfile: (profile: Profile) => Promise<AuthResult>;
   /** Notes on the account that the user asked for Pro (before payments exist), so they can be told when it opens. */
   markProInterest: () => Promise<AuthResult>;
+  /** Admin only: show the app as Free or Pro on this device. Doesn't change the real plan. */
+  setPlanView: (plan: Plan) => void;
   signOut: () => Promise<void>;
 }
 
@@ -64,6 +69,7 @@ const AuthContext = createContext<AuthValue | null>(null);
 
 const PREVIEW_ACCOUNTS = 'sadbarz:preview-accounts';
 const PREVIEW_SESSION = 'sadbarz:preview-session';
+const PLAN_VIEW = 'sadbarz:plan-view';
 
 type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile; plan?: Plan }>;
 
@@ -92,7 +98,14 @@ function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Recor
   // Email sign up stores `name`; Google fills `full_name` and `name`.
   const fromMeta = [meta.name, meta.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
   const name = fromMeta ?? email.split('@')[0];
-  return { id: u.id, email, name, profile: asProfile(meta.profile), plan: u.app_metadata?.plan === 'pro' ? 'pro' : 'free' };
+  return {
+    id: u.id,
+    email,
+    name,
+    profile: asProfile(meta.profile),
+    plan: u.app_metadata?.plan === 'pro' ? 'pro' : 'free',
+    admin: u.app_metadata?.admin === true,
+  };
 }
 
 function mapError(e: { code?: string; message?: string; status?: number } | null | undefined): AuthError {
@@ -108,8 +121,9 @@ function mapError(e: { code?: string; message?: string; status?: number } | null
   return 'unknown';
 }
 
+// The preview keeps accounts only on this device, for trying the app, so every preview account gets the switch.
 function previewUser(email: string, acc: PreviewAccounts[string]): Account {
-  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile), plan: acc.plan === 'pro' ? 'pro' : 'free' };
+  return { id: acc.id, email, name: acc.name, profile: asProfile(acc.profile), plan: acc.plan === 'pro' ? 'pro' : 'free', admin: true };
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -117,7 +131,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Account | null>(null);
   const [recovering, setRecovering] = useState(false);
   const [linkError, setLinkError] = useState<AuthError | null>(null);
+  const [planView, setPlanViewState] = useState<Plan | null>(null);
   const mode = supabase ? 'online' : 'preview';
+
+  useEffect(() => {
+    AsyncStorage.getItem(PLAN_VIEW)
+      .then((v) => setPlanViewState(v === 'pro' || v === 'free' ? v : null))
+      .catch(() => {});
+  }, []);
+
+  const setPlanView = useCallback((plan: Plan) => {
+    setPlanViewState(plan);
+    AsyncStorage.setItem(PLAN_VIEW, plan).catch(() => {});
+  }, []);
+
+  // What the screens see: an admin's switch overrides the plan; nobody else is affected.
+  const shown = useMemo(() => (user?.admin && planView ? { ...user, plan: planView } : user), [user, planView]);
 
   useEffect(() => {
     if (supabase) {
@@ -207,7 +236,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     accounts[email] = { id, name, hash: hashPassword(email, password) };
     await AsyncStorage.setItem(PREVIEW_ACCOUNTS, JSON.stringify(accounts));
     await AsyncStorage.setItem(PREVIEW_SESSION, email);
-    setUser({ id, email, name, profile: null, plan: 'free' });
+    setUser({ id, email, name, profile: null, plan: 'free', admin: true });
     return { ok: true, value: false };
   }, []);
 
@@ -304,8 +333,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AuthValue>(
-    () => ({ ready, user, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, signOut }),
-    [ready, user, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, signOut],
+    () => ({ ready, user: shown, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, setPlanView, signOut }),
+    [ready, shown, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, setPlanView, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
