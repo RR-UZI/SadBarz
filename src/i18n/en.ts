@@ -95,6 +95,7 @@ export const en: Record<StringKey, string> = {
   'block.weight': '+kg',
   'block.max': 'Max',
   'block.notePlaceholder': 'Note: dead stop, unbroken, explosive…',
+  'block.drag': 'Drag to move',
   'block.remove': 'Remove',
   'block.addNote': '+ note',
   'block.noExercises': 'No exercises yet.',

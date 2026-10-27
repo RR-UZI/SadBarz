@@ -8,6 +8,7 @@ import { clock, shortDuration } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
 import type { Block, BlockFormat, BlockItem, Exercise, SetRow } from '../types';
+import { DragList, moveItem } from './DragList';
 import { ExercisePicker } from './ExercisePicker';
 import { Button, Chip, Field, NumberField, Row, Segmented, Txt } from './ui';
 
@@ -148,46 +149,67 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
             {t('block.exercises')}
           </Txt>
           {block.items.length === 0 ? <Txt variant="small" color={colors.faint}>{t('block.noExercises')}</Txt> : null}
-          {block.items.map((it, i) => (
-            <ItemEditor
-              key={it.id}
-              item={it}
-              prefix={block.perRound === 'rotate' && block.format !== 'circuit' ? `${t('common.round')} ${itemTurns(block)[i] + 1}` : undefined}
-              exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
-              kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
-              onChange={(n) => set({ items: updateItem(block.items, n) })}
-              onRemove={() => set({ items: removeItem(block.items, it.id) })}
-            />
-          ))}
+          <DragList
+            items={block.items}
+            keyOf={(it) => it.id}
+            gap={space.sm}
+            onMove={(from, to) => set({ items: moveItem(block.items, from, to) })}
+            renderItem={(it, i, handle) => (
+              <ItemEditor
+                item={it}
+                handle={block.items.length > 1 ? handle : undefined}
+                prefix={block.perRound === 'rotate' && block.format !== 'circuit' ? `${t('common.round')} ${itemTurns(block)[i] + 1}` : undefined}
+                exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
+                kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
+                onChange={(n) => set({ items: updateItem(block.items, n) })}
+                onRemove={() => set({ items: removeItem(block.items, it.id) })}
+              />
+            )}
+          />
           <Button label={`+ ${t('block.addExercise')}`} variant="ghost" size="sm" onPress={() => setPickFor({ kind: 'items' })} />
         </View>
       ) : (
         <View style={{ gap: space.md }}>
-          {block.rows.map((row, i) => (
-            <View key={row.id} style={{ borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
-              <Row style={{ justifyContent: 'space-between' }}>
-                <Txt variant="small" style={{ fontWeight: '800' }}>
-                  #{i + 1}
-                </Txt>
-                <Button label={t('block.remove')} variant="ghost" size="sm" onPress={() => set({ rows: block.rows.filter((r) => r.id !== row.id) })} />
-              </Row>
-              <Row gap={space.lg} style={{ flexWrap: 'wrap' }}>
-                <NumberField label={t('common.sets')} value={row.sets} min={1} max={50} onChange={(v) => updateRow({ ...row, sets: v ?? 1 })} />
-                <NumberField label={`${t('block.restBetween')} (s)`} value={row.restSec} min={0} max={900} step={10} onChange={(v) => updateRow({ ...row, restSec: v ?? 0 })} />
-              </Row>
-              {row.items.map((it) => (
-                <ItemEditor
-                  key={it.id}
-                  item={it}
-                  exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
-                  kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
-                  onChange={(n) => updateRow({ ...row, items: updateItem(row.items, n) })}
-                  onRemove={() => updateRow({ ...row, items: removeItem(row.items, it.id) })}
+          <DragList
+            items={block.rows}
+            keyOf={(row) => row.id}
+            gap={space.md}
+            onMove={(from, to) => set({ rows: moveItem(block.rows, from, to) })}
+            renderItem={(row, i, rowHandle) => (
+              <View style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
+                <Row style={{ justifyContent: 'space-between' }}>
+                  <Row gap={space.xs}>
+                    {block.rows.length > 1 ? rowHandle : null}
+                    <Txt variant="small" style={{ fontWeight: '800' }}>
+                      #{i + 1}
+                    </Txt>
+                  </Row>
+                  <Button label={t('block.remove')} variant="ghost" size="sm" onPress={() => set({ rows: block.rows.filter((r) => r.id !== row.id) })} />
+                </Row>
+                <Row gap={space.lg} style={{ flexWrap: 'wrap' }}>
+                  <NumberField label={t('common.sets')} value={row.sets} min={1} max={50} onChange={(v) => updateRow({ ...row, sets: v ?? 1 })} />
+                  <NumberField label={`${t('block.restBetween')} (s)`} value={row.restSec} min={0} max={900} step={10} onChange={(v) => updateRow({ ...row, restSec: v ?? 0 })} />
+                </Row>
+                <DragList
+                  items={row.items}
+                  keyOf={(it) => it.id}
+                  gap={space.sm}
+                  onMove={(from, to) => updateRow({ ...row, items: moveItem(row.items, from, to) })}
+                  renderItem={(it, _j, handle) => (
+                    <ItemEditor
+                      item={it}
+                      handle={row.items.length > 1 ? handle : undefined}
+                      exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
+                      kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
+                      onChange={(n) => updateRow({ ...row, items: updateItem(row.items, n) })}
+                      onRemove={() => updateRow({ ...row, items: removeItem(row.items, it.id) })}
+                    />
+                  )}
                 />
-              ))}
-              <Button label={`+ ${t('block.addExercise')}`} variant="ghost" size="sm" onPress={() => setPickFor({ kind: 'row', rowId: row.id })} />
-            </View>
-          ))}
+                <Button label={`+ ${t('block.addExercise')}`} variant="ghost" size="sm" onPress={() => setPickFor({ kind: 'row', rowId: row.id })} />
+              </View>
+            )}
+          />
           <Txt variant="tiny" color={colors.faint}>
             {t('block.pairHint')}
           </Txt>
@@ -224,6 +246,7 @@ function ItemEditor({
   exerciseName,
   kind,
   prefix,
+  handle,
   onChange,
   onRemove,
 }: {
@@ -231,6 +254,7 @@ function ItemEditor({
   exerciseName: string;
   kind: Exercise['kind'];
   prefix?: string;
+  handle?: React.ReactNode;
   onChange: (i: BlockItem) => void;
   onRemove: () => void;
 }) {
@@ -239,6 +263,7 @@ function ItemEditor({
   return (
     <View style={{ backgroundColor: colors.surface2, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
       <Row style={{ justifyContent: 'space-between' }}>
+        {handle}
         <View style={{ flex: 1 }}>
           {prefix ? (
             <Txt variant="tiny" color={colors.accent}>

@@ -94,6 +94,7 @@ export const es = {
   'block.weight': '+kg',
   'block.max': 'Máximo',
   'block.notePlaceholder': 'Nota: DS, unbroken, explosivas…',
+  'block.drag': 'Arrastra para mover',
   'block.remove': 'Quitar',
   'block.addNote': '+ nota',
   'block.noExercises': 'Sin ejercicios todavía.',
