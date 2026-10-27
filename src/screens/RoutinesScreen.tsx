@@ -59,7 +59,8 @@ export function RoutinesScreen() {
 }
 
 // Block summary used on the routine screen and in workout mode.
-export function BlockSummary({ block, index }: { block: Block; index?: number }) {
+// names: exercise names the app doesn't have (an athlete's own exercises in a coach plan).
+export function BlockSummary({ block, index, names }: { block: Block; index?: number; names?: Record<string, string> }) {
   const t = useT();
   const { exerciseById } = useApp();
   const dur = blockDurationSec(block);
@@ -69,12 +70,12 @@ export function BlockSummary({ block, index }: { block: Block; index?: number })
       ? block.rows.map(
           (r) =>
             `${r.sets}x  ${r.items
-              .map((it) => `${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? '?'}${it.weightKg ? ` +${it.weightKg}kg` : ''}`)
+              .map((it) => `${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${it.weightKg ? ` +${it.weightKg}kg` : ''}`)
               .join('  +  ')}${r.restSec ? `   ·  ${t('block.rest').toLowerCase()} ${r.restSec}"` : ''}`,
         )
       : block.items.map(
           (it, i) =>
-            `${block.perRound === 'rotate' ? `${t('common.round')} ${turns[i] + 1}: ` : ''}${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? '?'}${
+            `${block.perRound === 'rotate' ? `${t('common.round')} ${turns[i] + 1}: ` : ''}${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${
               it.weightKg ? ` +${it.weightKg}kg` : ''
             }${it.note ? ` (${it.note})` : ''}`,
         );

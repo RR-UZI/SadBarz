@@ -8,11 +8,13 @@ import { WEEK_ROUTINE_IDS } from '../data/seed';
 import { useT } from '../i18n';
 import { formatLabel } from '../lib/blocks';
 import { fullProfile } from '../lib/questionnaire';
+import { syncEnabled } from '../lib/sync';
 import { startOfWeek } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
+import { ReviewHomeCard } from './CoachReviewScreen';
 import { WorkoutCard } from './HistoryScreen';
 
 export function HomeScreen() {
@@ -109,6 +111,9 @@ export function HomeScreen() {
           ))}
         </View>
       </Section>
+
+      {/* Uzi's review list: real admins on a real account (the plans live on the server). */}
+      {user?.admin && syncEnabled ? <ReviewHomeCard /> : null}
 
       <Section title={t('home.coachTitle')} right={<Badge label="PRO" color={colors.accent} textColor={colors.accentText} />}>
         {user?.plan === 'pro' && user.profile && !proMissing ? (

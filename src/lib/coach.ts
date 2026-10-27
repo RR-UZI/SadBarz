@@ -4,7 +4,7 @@
 // supabase/functions/coach-plan and supabase/migrations).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { Exercise, Language } from '../types';
+import type { Exercise, Goal, Language, Profile, Routine } from '../types';
 import { supabase } from './supabase';
 import { isoDay } from './records';
 
@@ -74,4 +74,125 @@ export async function planError(id: string): Promise<string | null> {
   if (!supabase) return null;
   const { data } = await supabase.from('coach_plans').select('error').eq('id', id).maybeSingle();
   return (data as { error: string | null } | null)?.error ?? null;
+}
+
+// ---------- Uzi's review (admins only; row level security lets admins read and update every plan) ----------
+
+/** A plan as the coach writes it: one routine per training day (0 = Monday). */
+export interface CoachPlan {
+  summary: string;
+  progression: string;
+  days: { day: number; routine: Routine }[];
+}
+
+export interface PlanInput {
+  athlete?: { name?: string };
+  profile?: Partial<Profile>;
+  records?: unknown[];
+  recentWorkouts?: unknown[];
+  exercises?: Exercise[];
+  revisions?: { note: string; at: string }[];
+}
+
+export interface ReviewItem {
+  id: string;
+  status: CoachStatus;
+  weeks: PlanWeeks;
+  createdAt: string;
+  updatedAt: string;
+  name?: string;
+  goal?: Goal;
+}
+
+export interface ReviewPlan extends ReviewItem {
+  startDate: string | null;
+  input: PlanInput;
+  plan: CoachPlan | null;
+  approvedPlan: CoachPlan | null;
+  reviewNote: string | null;
+  error: string | null;
+}
+
+/** Waiting for review first (oldest first), then the latest reviewed ones. */
+export async function reviewList(): Promise<{ pending: ReviewItem[]; recent: ReviewItem[] }> {
+  if (!supabase) return { pending: [], recent: [] };
+  const cols = 'id, status, weeks, created_at, updated_at, name:input->athlete->>name, goal:input->profile->>goal';
+  const [p, r] = await Promise.all([
+    supabase.from('coach_plans').select(cols).in('status', ['writing', 'review', 'returned']).order('created_at', { ascending: true }),
+    supabase.from('coach_plans').select(cols).in('status', ['approved', 'failed']).order('updated_at', { ascending: false }).limit(15),
+  ]);
+  if (p.error) throw p.error;
+  if (r.error) throw r.error;
+  const item = (x: Record<string, unknown>): ReviewItem => ({
+    id: x.id as string,
+    status: x.status as CoachStatus,
+    weeks: x.weeks as PlanWeeks,
+    createdAt: x.created_at as string,
+    updatedAt: x.updated_at as string,
+    name: (x.name as string | null) ?? undefined,
+    goal: (x.goal as Goal | null) ?? undefined,
+  });
+  return { pending: (p.data ?? []).map(item), recent: (r.data ?? []).map(item) };
+}
+
+export async function loadPlan(id: string): Promise<ReviewPlan | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('coach_plans')
+    .select('id, status, weeks, start_date, created_at, updated_at, input, plan, approved_plan, review_note, error')
+    .eq('id', id)
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+  const input = (data.input ?? {}) as PlanInput;
+  return {
+    id: data.id,
+    status: data.status,
+    weeks: data.weeks,
+    startDate: data.start_date,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at,
+    name: input.athlete?.name,
+    goal: input.profile?.goal,
+    input,
+    plan: data.plan,
+    approvedPlan: data.approved_plan,
+    reviewNote: data.review_note,
+    error: data.error,
+  };
+}
+
+/** Approve as written, or with Uzi's edits (kept apart so the coach can learn from them). */
+export async function approvePlan(id: string, reviewer: string, edited: CoachPlan | null): Promise<void> {
+  if (!supabase) return;
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from('coach_plans')
+    .update({ status: 'approved', approved_plan: edited, reviewed_by: reviewer, reviewed_at: now, updated_at: now })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+/** Send it back with a note: the coach writes it again following the note. */
+export async function sendBack(id: string, note: string, exercises: Exercise[]): Promise<AskResult> {
+  if (!supabase) return { ok: true };
+  const { error } = await supabase.functions.invoke('coach-plan', {
+    body: { rewrite: id, note, exercises: exercises.map(({ id: exId, name, kind, category }) => ({ id: exId, name, kind, category })) },
+  });
+  if (!error) return { ok: true };
+  const res = (error as { context?: Response }).context;
+  const raw = res && typeof res.text === 'function' ? await res.text().catch(() => '') : '';
+  return { ok: false, error: 'failed', detail: [res?.status, raw.slice(0, 200) || error.message].filter(Boolean).join(' · ') };
+}
+
+// Screens that show plans listen here, so a review on one screen updates the others.
+const listeners = new Set<() => void>();
+export function onPlansChanged(fn: () => void) {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+}
+export function plansChanged() {
+  listeners.forEach((fn) => fn());
 }
