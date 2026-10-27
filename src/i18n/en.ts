@@ -567,6 +567,8 @@ export const en: Record<StringKey, string> = {
   'profile.open': 'Profile',
   'profile.addPhoto': 'Add photo',
   'profile.changePhoto': 'Change photo',
+  'profile.viewPhoto': 'View photo',
+  'profile.tapToClose': 'Tap to close',
   'profile.removePhoto': 'Remove photo',
   'profile.photoError': 'Could not load the photo. Try another image.',
   'profile.planFree': 'Free plan',

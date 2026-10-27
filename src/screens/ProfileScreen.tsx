@@ -1,7 +1,7 @@
 // Athlete profile, for every plan: photo, stats, personal records (PRs) and the
 // best marks found in the workout log.
 import React, { useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Image, Modal, Pressable, ScrollView, View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
 import { Badge, Button, Card, Field, NumberField, Row, Screen, Section, Segmented, Txt } from '../components/ui';
@@ -39,6 +39,7 @@ export function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [photoError, setPhotoError] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [viewing, setViewing] = useState(false);
 
   const stats = useMemo(() => profileStats(workouts), [workouts]);
   const bests = useMemo(() => loggedBests(workouts, exerciseById), [workouts, exerciseById]);
@@ -66,7 +67,8 @@ export function ProfileScreen() {
   return (
     <Screen title={t('profile.title')} onBack={nav.pop}>
       <View style={{ alignItems: 'center', gap: space.sm }}>
-        <Pressable onPress={changePhoto} accessibilityRole="button" accessibilityLabel={avatar ? t('profile.changePhoto') : t('profile.addPhoto')}>
+        {/* Tapping the photo only shows it big; the button below is what changes it. */}
+        <Pressable onPress={() => setViewing(true)} disabled={!avatar} accessibilityRole="button" accessibilityLabel={t('profile.viewPhoto')}>
           <Avatar uri={avatar} name={user?.name} size={112} />
           {loading ? (
             <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 56, backgroundColor: 'rgba(0,0,0,0.5)' }}>
@@ -83,6 +85,26 @@ export function ProfileScreen() {
             {t('profile.photoError')}
           </Txt>
         ) : null}
+        <Modal visible={viewing && !!avatar} transparent animationType="fade" onRequestClose={() => setViewing(false)}>
+          <Pressable
+            onPress={() => setViewing(false)}
+            accessibilityRole="button"
+            accessibilityLabel={t('profile.tapToClose')}
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.92)', alignItems: 'center', justifyContent: 'center', padding: space.xl, gap: space.lg }}
+          >
+            {avatar ? (
+              <Image
+                source={{ uri: avatar }}
+                style={{ width: '100%', maxWidth: 360, aspectRatio: 1, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.accent }}
+                accessibilityIgnoresInvertColors
+              />
+            ) : null}
+            <Txt variant="h2">{user?.name}</Txt>
+            <Txt variant="small" color={colors.muted}>
+              {t('profile.tapToClose')}
+            </Txt>
+          </Pressable>
+        </Modal>
         <Txt variant="h2" style={{ marginTop: space.sm }}>
           {user?.name}
         </Txt>

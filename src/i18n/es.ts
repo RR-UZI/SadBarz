@@ -566,6 +566,8 @@ export const es = {
   'profile.open': 'Perfil',
   'profile.addPhoto': 'Agregar foto',
   'profile.changePhoto': 'Cambiar foto',
+  'profile.viewPhoto': 'Ver foto',
+  'profile.tapToClose': 'Toca para cerrar',
   'profile.removePhoto': 'Quitar foto',
   'profile.photoError': 'No se pudo cargar la foto. Prueba con otra imagen.',
   'profile.planFree': 'Plan gratis',
