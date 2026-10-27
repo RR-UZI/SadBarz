@@ -558,6 +558,9 @@ export const en: Record<StringKey, string> = {
   'settings.plan': 'Plan',
   'settings.planFree': 'Free · up to {n} of your own routines',
   'settings.planPro': 'Pro',
+  'settings.planView': 'View the app as',
+  'settings.planViewFree': 'Free',
+  'settings.planViewHelp': 'Only your admin account sees this switch. It changes what you see on this device so you can try Free and Pro; your real plan stays the same.',
   'settings.seePro': 'See Pro',
 
   'profile.title': 'My profile',

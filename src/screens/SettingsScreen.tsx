@@ -17,7 +17,7 @@ export function SettingsScreen() {
   const t = useT();
   const nav = useNav();
   const { settings, updateSettings, reloadExamples, sync, syncNow, avatar } = useApp();
-  const { user, mode, signOut } = useAuth();
+  const { user, mode, signOut, setPlanView } = useAuth();
   const [reloaded, setReloaded] = useState(false);
   const set = (patch: Partial<Settings>) => updateSettings(patch);
 
@@ -67,6 +67,22 @@ export function SettingsScreen() {
             {user?.plan === 'pro' ? t('settings.planPro') : t('settings.planFree', { n: FREE_ROUTINE_LIMIT })}
           </Txt>
         </Card>
+        {user?.admin ? (
+          <Card style={{ gap: space.sm, borderColor: colors.accent }}>
+            <Txt variant="label">{t('settings.planView')}</Txt>
+            <Segmented
+              value={user.plan}
+              onChange={setPlanView}
+              options={[
+                { value: 'free', label: t('settings.planViewFree') },
+                { value: 'pro', label: 'Pro' },
+              ]}
+            />
+            <Txt variant="tiny" color={colors.muted}>
+              {t('settings.planViewHelp')}
+            </Txt>
+          </Card>
+        ) : null}
         {user?.plan !== 'pro' ? <Button label={t('settings.seePro')} onPress={() => showPro('info')} /> : null}
       </Section>
 
