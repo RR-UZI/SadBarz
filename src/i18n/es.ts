@@ -613,6 +613,22 @@ export const es = {
   'record.notePlaceholder': 'Ej. Competencia, test del mes, estrictas',
   'record.needName': 'Ponle nombre al récord.',
   'record.needValue': 'Agrega la marca.',
+  'coach.lengthTitle': '¿Cuánto dura tu plan?',
+  'coach.weeks1': '1 semana',
+  'coach.weeks2': '2 semanas',
+  'coach.weeks4': '1 mes',
+  'coach.askBody': 'El coach arma una semana de rutinas con tus respuestas y tus entrenos. Se repite hasta que termine el plan, un poco más difícil cada semana.',
+  'coach.ask': 'Pedir mi plan',
+  'coach.asking': 'Enviando…',
+  'coach.reviewing': 'Tu coach está revisando tu plan',
+  'coach.reviewingBody': 'Plan de {weeks} · lo pediste el {date}. Aparece aquí cuando esté listo.',
+  'coach.ready': 'Tu plan está listo',
+  'coach.readyBody': 'Plan de {weeks}. Muy pronto lo verás completo en Mi plan.',
+  'coach.newPlan': 'Pedir un plan nuevo',
+  'coach.failed': 'No se pudo armar tu plan. Intenta otra vez.',
+  'coach.limit': 'Ya pediste varios planes hoy. Intenta mañana.',
+  'coach.needProfile': 'Completa tus preguntas Pro primero.',
+  'coach.needPro': 'El coach es parte de SadBarz Pro.',
 };
 
 export type StringKey = keyof typeof es;
