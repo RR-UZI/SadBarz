@@ -15,6 +15,7 @@ import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
 import { ReviewHomeCard } from './CoachReviewScreen';
+import { MyPlanHomeCard } from './MyPlanScreen';
 import { WorkoutCard } from './HistoryScreen';
 
 export function HomeScreen() {
@@ -67,6 +68,9 @@ export function HomeScreen() {
           {user ? t('home.helloName', { name: user.name.split(' ')[0] }) : t('home.hello')}
         </Txt>
       </View>
+
+      {/* The coach's approved plan: today's routine first, it's what they came for. */}
+      <MyPlanHomeCard />
 
       <Card>
         <Txt variant="label">{t('home.thisWeek')}</Txt>

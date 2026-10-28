@@ -9,7 +9,7 @@ export type TabName = 'home' | 'routines' | 'timers' | 'history';
 export type Route =
   | { name: 'routine'; id: string }
   | { name: 'editRoutine'; id?: string; draft?: Routine; onSave?: (r: Routine) => void } // draft + onSave: edit a routine that isn't saved in the app (a coach plan)
-  | { name: 'workout'; routineId: string }
+  | { name: 'workout'; routineId: string; routine?: Routine } // routine: one that isn't saved in the app (a day of Mi plan)
   | { name: 'quickTimer'; block: Block; title: string }
   | { name: 'stopwatch' }
   | { name: 'workoutDetail'; id: string }
@@ -18,7 +18,8 @@ export type Route =
   | { name: 'profile' }
   | { name: 'editRecord'; id?: string; draft?: Partial<PersonalRecord> }
   | { name: 'coachReview' }
-  | { name: 'coachPlan'; id: string };
+  | { name: 'coachPlan'; id: string }
+  | { name: 'myPlan' };
 
 interface Nav {
   tab: TabName;

@@ -16,7 +16,7 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 - **Accounts**: welcome, sign up, log in, continue with Google (web), forgot password, log out (Settings).
 - **Athlete profile** (every plan): tap the photo on Home, or the account card in Settings. Profile photo (cut to a square and shrunk to 256 px, saved with the user's data so every device shows it; tapping it shows it big, only "Cambiar foto" changes it), stats (workouts, hours, reps, weeks in a row), personal records added by hand (max reps, hold seconds, added weight, or finish time of a test), and best marks read from the workout log (most reps in a set, longest hold, heaviest added weight, best AMRAP score, best For time). Tapping a logged mark saves it as a PR.
 - **Onboarding**: after the first sign in, the questions for the coach, one per screen, then a review. Free accounts answer the short version (goal: compete, endurance, strength, skills, statics or get fit; max reps test or level; equipment; training days, up to 6 so there is always a rest day). Pro answers the full version: the same plus a goal page (statics: hardest stage and seconds held; endurance: more max reps; strength: added weight and reps; skills: skills they have, the next one and where they are with it; compete: which competition, date, category, format, last result, weakest move; get fit: what they want, time off, a quick test, other sports, daily activity, goal weight), session length, start date, age and weight, injuries and reminders. A Pro athlete whose profile came from the short version gets a "Completar preguntas" card on Home that asks only what is missing. Answers can be changed in Settings.
-- **AI coach (Pro, first part)**: ask for a plan of 1 week, 2 weeks or 1 month; the coach writes it and it waits for Uzi's review (see AI coach below).
+- **AI coach (Pro)**: ask for a plan of 1 week, 2 weeks or 1 month; the coach writes it, Uzi reviews it, and the athlete follows it in Mi plan (see AI coach below).
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
 
@@ -72,6 +72,8 @@ A Pro athlete with a complete profile picks a plan length on Home (1 week, 2 wee
 - **Aprobar**: the athlete can see it. If he edited any day first (Editar opens the normal routine editor), his version is saved apart in `approved_plan`, so the original stays to compare.
 - **Devolver con nota**: the function rewrites the same plan following the note, keeping the old version and the note in the plan's history. The coach also reads Uzi's latest notes on every new plan, so it keeps applying what he corrects.
 
+**Mi plan.** Once approved, the athlete gets a "Mi plan" card at the top of Home: today's routine with a Start button (or "Hoy toca descanso" and the next day), the week of the plan and the days left. "Ver mi plan" opens the whole week: tap a day to see and start its routine, a ✓ marks days done this week, and the coach's progression note is at the bottom. It shows Uzi's edited version when there is one, and it's kept on the device so it opens with no signal.
+
 Setup, once:
 
 1. Run `supabase/migrations/20261027000000_coach_plans.sql` in the SQL Editor.
@@ -96,6 +98,7 @@ Check it locally with `deno check supabase/functions/coach-plan/index.ts` (the a
 | `supabase/functions/coach-plan/` | The AI coach: writes a plan with Claude and saves it for Uzi's review |
 | `src/lib/coach.ts`, `src/components/CoachCard.tsx` | Asking for a plan and its status on Home |
 | `src/screens/CoachReviewScreen.tsx` | Uzi's review: plans waiting, approve, edit, send back with a note |
+| `src/screens/MyPlanScreen.tsx` | Mi plan: the athlete's approved plan, today's routine, the week |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
 | `src/store/AppStore.tsx` | App state per user: device copy plus cloud sync |
 | `src/data/seed.ts` | Exercise library and example routines |

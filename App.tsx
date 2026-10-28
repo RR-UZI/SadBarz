@@ -17,6 +17,7 @@ import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
 import { RoutinesScreen } from './src/screens/RoutinesScreen';
 import { CoachPlanScreen, CoachReviewScreen } from './src/screens/CoachReviewScreen';
+import { MyPlanScreen } from './src/screens/MyPlanScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { QuickTimerScreen, StopwatchScreen, TimersScreen } from './src/screens/TimersScreen';
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
@@ -81,7 +82,7 @@ function renderRoute(r: Route) {
     case 'editRoutine':
       return <RoutineEditorScreen id={r.id} draft={r.draft} onSave={r.onSave} />;
     case 'workout':
-      return <WorkoutScreen routineId={r.routineId} />;
+      return <WorkoutScreen routineId={r.routineId} routine={r.routine} />;
     case 'quickTimer':
       return <QuickTimerScreen block={r.block} title={r.title} />;
     case 'stopwatch':
@@ -100,6 +101,8 @@ function renderRoute(r: Route) {
       return <CoachReviewScreen />;
     case 'coachPlan':
       return <CoachPlanScreen id={r.id} />;
+    case 'myPlan':
+      return <MyPlanScreen />;
   }
 }
 
