@@ -107,6 +107,7 @@ export interface ReviewItem {
 export interface ReviewPlan extends ReviewItem {
   startDate: string | null;
   code: string | null; // other athletes redeem it to get the plan's routines (only admins can read it)
+  codeError?: string; // why the code couldn't be read, shown instead of hiding it
   input: PlanInput;
   plan: CoachPlan | null;
   approvedPlan: CoachPlan | null;
@@ -147,13 +148,16 @@ export async function loadPlan(id: string): Promise<ReviewPlan | null> {
   if (!data) return null;
   const input = (data.input ?? {}) as PlanInput;
   // Codes are only readable through plan_code(), which answers admins only.
-  const code = data.status === 'approved' ? await supabase.rpc('plan_code', { plan_id: id }).then((r) => (r.data as string | null) ?? null) : null;
+  const read = data.status === 'approved' ? await supabase.rpc('plan_code', { plan_id: id }) : null;
+  const code = (read?.data as string | null) ?? null;
+  const codeError = read && !code ? read.error?.message ?? 'no code' : undefined;
   return {
     id: data.id,
     status: data.status,
     weeks: data.weeks,
     startDate: data.start_date,
     code,
+    codeError,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     name: input.athlete?.name,

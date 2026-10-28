@@ -630,6 +630,7 @@ export const en: Record<StringKey, string> = {
   'code.copied': 'Copied ✓',
   'code.share': 'Share',
   'code.adminBody': 'Other athletes redeem it in Routines and get these routines, as you approved them.',
+  'code.loadError': "Couldn't load this plan's code ({e}).",
   'code.redeem': 'Have a plan code? Redeem it',
   'code.redeemTitle': 'Redeem a code',
   'code.redeemFree': "On the free plan you can redeem 1 code a month. Its routines don't count toward your limit.",
