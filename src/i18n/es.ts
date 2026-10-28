@@ -459,6 +459,7 @@ export const es = {
   'onb.compete.last': 'Tu último resultado',
   'onb.compete.lastPlaceholder': 'Ej. Califest 2025 · 14:20 · 6º lugar',
   'onb.compete.weakest': '¿Qué ejercicio te cuesta más en competencia?',
+  'onb.compete.weakestPick': 'Elige un ejercicio',
   'category.beginner': 'Principiante',
   'category.intermediate': 'Intermedio',
   'category.advanced': 'Avanzado',
