@@ -65,6 +65,8 @@ export interface Routine {
   note?: string;
   blocks: Block[];
   example?: boolean;
+  /** Added by redeeming a plan code (that code). Like the examples, it doesn't count toward the free limit. */
+  fromCode?: string;
   createdAt: number;
   updatedAt: number;
 }

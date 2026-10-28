@@ -1,6 +1,7 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 
+import { RedeemCard } from '../components/PlanCode';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { blockDurationSec, formatLabel, itemTarget, itemTurns } from '../lib/blocks';
@@ -30,6 +31,7 @@ export function RoutinesScreen() {
           </Txt>
         </Pressable>
       ) : null}
+      <RedeemCard />
       <View style={{ gap: space.md, marginTop: space.lg }}>
         {routines.length === 0 ? <Txt color={colors.muted}>{t('routines.empty')}</Txt> : null}
         {routines.map((r) => (
@@ -41,7 +43,7 @@ export function RoutinesScreen() {
                   {r.blocks.length} {t('routines.blocks')}
                 </Txt>
               </View>
-              {r.example ? <Badge label={t('common.example')} /> : null}
+              {r.example ? <Badge label={t('common.example')} /> : r.fromCode ? <Badge label={r.fromCode} /> : null}
             </Row>
             <View style={{ marginTop: space.sm, gap: 2 }}>
               {r.blocks.slice(0, 4).map((b) => (

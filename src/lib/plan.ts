@@ -6,11 +6,11 @@ import type { Routine } from '../types';
 
 export type Plan = 'free' | 'pro';
 
-/** Own routines a free account can keep. The example routines don't count. */
+/** Own routines a free account can keep. The examples and routines from plan codes don't count. */
 export const FREE_ROUTINE_LIMIT = 5;
 
 export function ownRoutines(routines: Routine[]) {
-  return routines.filter((r) => !r.example);
+  return routines.filter((r) => !r.example && !r.fromCode);
 }
 
 export function useRoutineLimit() {

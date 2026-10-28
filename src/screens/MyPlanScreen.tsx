@@ -5,6 +5,7 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { longDate } from '../components/onboarding';
+import { PlanCodeCard } from '../components/PlanCode';
 import { Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
 import { cachedPlan, myPlan, onPlansChanged, planTiming, type MyPlan } from '../lib/coach';
@@ -275,6 +276,7 @@ export function MyPlanScreen() {
           <Txt style={{ marginTop: space.sm }}>{plan.progression}</Txt>
         </Card>
       ) : null}
+      {plan.code ? <PlanCodeCard code={plan.code} body={t('code.ownerBody')} style={{ marginTop: space.md }} /> : null}
     </Screen>
   );
 }

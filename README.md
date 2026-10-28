@@ -74,9 +74,12 @@ A Pro athlete with a complete profile picks a plan length on Home (1 week, 2 wee
 
 **Mi plan.** Once approved, the athlete gets a "Mi plan" card at the top of Home: today's routine with a Start button (or "Hoy toca descanso" and the next day), the week of the plan and the days left. "Ver mi plan" opens the whole week: tap a day to see and start its routine, a ✓ marks days done this week, and the coach's progression note is at the bottom. It shows Uzi's edited version when there is one, and it's kept on the device so it opens with no signal.
 
+**Plan codes.** Every plan gets a code like `SB-7K4QXM`. Uzi sees it on an approved plan in his review, and the athlete sees it at the bottom of Mi plan to share it. Anyone who redeems it in Rutinas ("¿Tienes un código de plan? Canjéalo") gets that plan's routines, as Uzi approved them, plus any of the original athlete's own exercises they use. Free accounts redeem 1 code per calendar month (Mexico City time), Pro and admins as many as they like; the server function `redeem_plan_code` checks it, so the app can't skip it. Redeeming the same code again doesn't count. Routines from codes carry a badge with the code and, like the examples, don't count toward the free limit (a duplicate of one does).
+
 Setup, once:
 
 1. Run `supabase/migrations/20261027000000_coach_plans.sql` in the SQL Editor.
+   Then `supabase/migrations/20261028000000_plan_codes.sql` (plan codes).
 2. **Edge Functions → Secrets**: `ANTHROPIC_API_KEY` (never in the app or the repo).
 3. **Edge Functions → Deploy a new function → Via Editor**, name it `coach-plan`, paste `supabase/functions/coach-plan/index.ts`, deploy. The function checks the athlete's session itself, so if every call fails with "Invalid JWT" (projects on the new signing keys), turn "Verify JWT" off for it. With the Supabase CLI instead: `supabase functions deploy coach-plan`.
 
@@ -99,6 +102,7 @@ Check it locally with `deno check supabase/functions/coach-plan/index.ts` (the a
 | `src/lib/coach.ts`, `src/components/CoachCard.tsx` | Asking for a plan and its status on Home |
 | `src/screens/CoachReviewScreen.tsx` | Uzi's review: plans waiting, approve, edit, send back with a note |
 | `src/screens/MyPlanScreen.tsx` | Mi plan: the athlete's approved plan, today's routine, the week |
+| `src/components/PlanCode.tsx` | A plan's code to share, and redeeming a code in Rutinas |
 | `src/types.ts` | Data shapes: exercises, blocks, routines, workouts, settings |
 | `src/store/AppStore.tsx` | App state per user: device copy plus cloud sync |
 | `src/data/seed.ts` | Exercise library and example routines |
