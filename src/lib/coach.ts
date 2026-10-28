@@ -170,14 +170,34 @@ export async function loadPlan(id: string): Promise<ReviewPlan | null> {
   };
 }
 
-/** Approve as written, or with Uzi's edits (kept apart so the coach can learn from them). */
-export async function approvePlan(id: string, reviewer: string, edited: CoachPlan | null): Promise<void> {
+/** Every exercise id the plan's routines use. */
+export function planExerciseIds(plan: CoachPlan): Set<string> {
+  return new Set(plan.days.flatMap((d) => d.routine.blocks.flatMap((b) => [...b.items, ...b.rows.flatMap((r) => r.items)].map((it) => it.exerciseId))));
+}
+
+/**
+ * Approve as written, or with Uzi's edits (kept apart so the coach can learn from them).
+ * Exercises Uzi created and put in the plan exist only in his account, so they're added to the
+ * plan's exercise list: the athlete's app and anyone who redeems the code add them from there.
+ */
+export async function approvePlan(plan: ReviewPlan, reviewer: string, edited: CoachPlan | null, mine: Exercise[]): Promise<void> {
   if (!supabase) return;
+  const week = edited ?? plan.plan;
+  const have = new Set((plan.input.exercises ?? []).map((e) => e.id));
+  const used = week ? planExerciseIds(week) : new Set<string>();
+  const extra = mine.filter((e) => e.custom && used.has(e.id) && !have.has(e.id)).map(({ id, name, kind, category }) => ({ id, name, kind, category }));
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('coach_plans')
-    .update({ status: 'approved', approved_plan: edited, reviewed_by: reviewer, reviewed_at: now, updated_at: now })
-    .eq('id', id);
+    .update({
+      status: 'approved',
+      approved_plan: edited,
+      reviewed_by: reviewer,
+      reviewed_at: now,
+      updated_at: now,
+      ...(extra.length ? { input: { ...plan.input, exercises: [...(plan.input.exercises ?? []), ...extra] } } : null),
+    })
+    .eq('id', plan.id);
   if (error) throw error;
 }
 
@@ -214,6 +234,8 @@ export interface MyPlan {
   progression: string;
   /** One routine per training day (0 = Monday), in day order. */
   days: { day: number; routine: Routine }[];
+  /** Exercises the routines use that may not be in this athlete's app (ones the coach created). */
+  exercises?: Exercise[];
 }
 
 // Kept on the device too, so the plan opens with no signal at the gym.
@@ -221,9 +243,18 @@ const myPlanKey = (userId: string) => `sadbarz:my-plan:${userId}`;
 const PREVIEW_PLAN_KEY = 'sadbarz:preview-plan';
 const memo = new Map<string, MyPlan | null>();
 
-function toMyPlan(row: { id: string; weeks: PlanWeeks; start_date: string | null; created_at: string; plan: CoachPlan | null; approved_plan: CoachPlan | null }): MyPlan | null {
+function toMyPlan(row: {
+  id: string;
+  weeks: PlanWeeks;
+  start_date: string | null;
+  created_at: string;
+  plan: CoachPlan | null;
+  approved_plan: CoachPlan | null;
+  exercises?: unknown;
+}): MyPlan | null {
   const plan = row.approved_plan ?? row.plan;
   if (!plan?.days?.length) return null;
+  const used = planExerciseIds(plan);
   return {
     id: row.id,
     weeks: row.weeks,
@@ -233,6 +264,7 @@ function toMyPlan(row: { id: string; weeks: PlanWeeks; start_date: string | null
       .sort((a, b) => a.day - b.day)
       // A stable id per plan and day, so the workouts done can be matched to the plan's days.
       .map((d) => ({ day: d.day, routine: { ...d.routine, id: `plan_${row.id}_${d.day}` } })),
+    exercises: (Array.isArray(row.exercises) ? (row.exercises as Exercise[]) : []).filter((e) => used.has(e.id)),
   };
 }
 
@@ -252,7 +284,7 @@ export async function myPlan(userId: string): Promise<MyPlan | null> {
   if (!supabase) return cachedPlan(userId);
   const { data, error } = await supabase
     .from('coach_plans')
-    .select('id, weeks, start_date, created_at, plan, approved_plan')
+    .select('id, weeks, start_date, created_at, plan, approved_plan, exercises:input->exercises')
     // Admins can read every plan, so ask for this user's own.
     .eq('user_id', userId)
     .eq('status', 'approved')

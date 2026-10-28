@@ -182,7 +182,7 @@ export function CoachPlanScreen({ id }: { id: string }) {
     setBusy(true);
     setProblem(null);
     try {
-      await approvePlan(plan.id, user.id, edited);
+      await approvePlan(plan, user.id, edited, exercises);
       edits.delete(id);
       plansChanged();
       nav.pop();
