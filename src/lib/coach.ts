@@ -196,3 +196,85 @@ export function onPlansChanged(fn: () => void) {
 export function plansChanged() {
   listeners.forEach((fn) => fn());
 }
+
+// ---------- Mi plan (the athlete's latest approved plan) ----------
+
+export interface MyPlan {
+  id: string;
+  weeks: PlanWeeks;
+  startDate: string; // YYYY-MM-DD, the first day of week 1
+  progression: string;
+  /** One routine per training day (0 = Monday), in day order. */
+  days: { day: number; routine: Routine }[];
+}
+
+// Kept on the device too, so the plan opens with no signal at the gym.
+const myPlanKey = (userId: string) => `sadbarz:my-plan:${userId}`;
+const PREVIEW_PLAN_KEY = 'sadbarz:preview-plan';
+const memo = new Map<string, MyPlan | null>();
+
+function toMyPlan(row: { id: string; weeks: PlanWeeks; start_date: string | null; created_at: string; plan: CoachPlan | null; approved_plan: CoachPlan | null }): MyPlan | null {
+  const plan = row.approved_plan ?? row.plan;
+  if (!plan?.days?.length) return null;
+  return {
+    id: row.id,
+    weeks: row.weeks,
+    startDate: row.start_date ?? row.created_at.slice(0, 10),
+    progression: plan.progression ?? '',
+    days: [...plan.days]
+      .sort((a, b) => a.day - b.day)
+      // A stable id per plan and day, so the workouts done can be matched to the plan's days.
+      .map((d) => ({ day: d.day, routine: { ...d.routine, id: `plan_${row.id}_${d.day}` } })),
+  };
+}
+
+/** What this device last saw, right away. */
+export async function cachedPlan(userId: string): Promise<MyPlan | null> {
+  if (memo.has(userId)) return memo.get(userId) ?? null;
+  const saved = await AsyncStorage.getItem(supabase ? myPlanKey(userId) : PREVIEW_PLAN_KEY).catch(() => null);
+  try {
+    return saved ? (JSON.parse(saved) as MyPlan) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The latest approved plan from the server (the cached one when offline). */
+export async function myPlan(userId: string): Promise<MyPlan | null> {
+  if (!supabase) return cachedPlan(userId);
+  const { data, error } = await supabase
+    .from('coach_plans')
+    .select('id, weeks, start_date, created_at, plan, approved_plan')
+    // Admins can read every plan, so ask for this user's own.
+    .eq('user_id', userId)
+    .eq('status', 'approved')
+    .order('reviewed_at', { ascending: false, nullsFirst: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) return cachedPlan(userId);
+  const plan = data ? toMyPlan(data) : null;
+  memo.set(userId, plan);
+  if (plan) AsyncStorage.setItem(myPlanKey(userId), JSON.stringify(plan)).catch(() => {});
+  else AsyncStorage.removeItem(myPlanKey(userId)).catch(() => {});
+  return plan;
+}
+
+export type PlanPhase = 'upcoming' | 'active' | 'ended';
+
+/** Where today falls in the plan. Dates are local calendar days. */
+export function planTiming(plan: MyPlan, today: string) {
+  const day = 86_400_000;
+  const [sy, sm, sd] = plan.startDate.split('-').map(Number);
+  const [ty, tm, td] = today.split('-').map(Number);
+  // UTC on both sides keeps daylight saving changes out of the day count.
+  const sinceStart = Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(sy, sm - 1, sd)) / day);
+  const total = plan.weeks * 7;
+  const end = new Date(Date.UTC(sy, sm - 1, sd) + (total - 1) * day);
+  const phase: PlanPhase = sinceStart < 0 ? 'upcoming' : sinceStart >= total ? 'ended' : 'active';
+  return {
+    phase,
+    week: Math.min(plan.weeks, Math.max(1, Math.floor(sinceStart / 7) + 1)),
+    daysLeft: Math.max(0, Math.min(total, total - sinceStart)), // today included
+    endDate: `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}-${String(end.getUTCDate()).padStart(2, '0')}`,
+  };
+}

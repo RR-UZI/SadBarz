@@ -16,7 +16,7 @@ import { clock, uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
-import type { AmrapScore, Block, BlockLog, ForTimeScore, LogEntry, Workout } from '../types';
+import type { AmrapScore, Block, BlockLog, ForTimeScore, LogEntry, Routine, Workout } from '../types';
 import { BlockSummary } from './RoutinesScreen';
 
 type Phase =
@@ -40,11 +40,11 @@ export function useKeepAwake(enabled: boolean) {
   }, [enabled]);
 }
 
-export function WorkoutScreen({ routineId }: { routineId: string }) {
+export function WorkoutScreen({ routineId, routine: given }: { routineId: string; routine?: Routine }) {
   const t = useT();
   const nav = useNav();
   const { routines, settings, saveWorkout } = useApp();
-  const routine = routines.find((r) => r.id === routineId);
+  const routine = given ?? routines.find((r) => r.id === routineId);
   const blocks = routine?.blocks ?? [];
 
   const [index, setIndex] = useState(0);
