@@ -629,6 +629,7 @@ export const es = {
   'code.copied': 'Copiado ✓',
   'code.share': 'Compartir',
   'code.adminBody': 'Otros atletas lo canjean en Rutinas y reciben estas rutinas, como las aprobaste.',
+  'code.loadError': 'No se pudo cargar el código de este plan ({e}).',
   'code.redeem': '¿Tienes un código de plan? Canjéalo',
   'code.redeemTitle': 'Canjear código',
   'code.redeemFree': 'Con el plan gratis canjeas 1 código al mes. Sus rutinas no cuentan en tu límite.',

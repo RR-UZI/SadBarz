@@ -253,6 +253,11 @@ export function CoachPlanScreen({ id }: { id: string }) {
         </Txt>
       ) : null}
       {plan.status === 'approved' && plan.code ? <PlanCodeCard code={plan.code} body={t('code.adminBody')} style={{ marginTop: space.md }} /> : null}
+      {plan.status === 'approved' && !plan.code ? (
+        <Txt variant="small" color={colors.warn} style={{ marginTop: space.md }}>
+          {t('code.loadError', { e: plan.codeError ?? '' })}
+        </Txt>
+      ) : null}
       {plan.status === 'failed' ? (
         <Txt color={colors.danger} style={{ marginTop: space.md }}>
           {t('review.failedNote', { e: plan.error ?? '' })}
