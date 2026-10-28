@@ -1,5 +1,5 @@
 // Shared building blocks for every screen.
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -211,6 +211,53 @@ export function Chip({ label, active, onPress, color }: { label: string; active?
   );
 }
 
+// A dropdown: shows the chosen option, and opens the list below it when tapped.
+export function Select<T extends string>({
+  value,
+  options,
+  onChange,
+  placeholder,
+}: {
+  value?: T;
+  options: { value: T; label: string }[];
+  onChange: (v: T | undefined) => void;
+  placeholder: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const chosen = options.find((o) => o.value === value);
+  return (
+    <View>
+      <Pressable
+        onPress={() => setOpen((o) => !o)}
+        accessibilityRole="button"
+        style={[styles.input, { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, open && { borderColor: colors.accent }]}
+      >
+        <Text style={{ color: chosen ? colors.text : colors.faint, fontSize: font.body }}>{chosen ? chosen.label : placeholder}</Text>
+        <Text style={{ color: colors.muted, fontSize: 14 }}>{open ? '▲' : '▼'}</Text>
+      </Pressable>
+      {open ? (
+        <View style={styles.selectList}>
+          {[{ value: undefined, label: '—' }, ...options].map((o) => {
+            const active = o.value === value;
+            return (
+              <Pressable
+                key={o.value ?? ''}
+                onPress={() => {
+                  onChange(o.value);
+                  setOpen(false);
+                }}
+                style={({ pressed }) => [styles.selectOption, (active || pressed) && { backgroundColor: colors.surface2 }]}
+              >
+                <Text style={{ color: active ? colors.accent : o.value ? colors.text : colors.faint, fontSize: font.body, fontWeight: active ? '700' : '400' }}>{o.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
 // Number input with - / + buttons. Empty input = undefined when allowEmpty.
 export function NumberField({
   label,
@@ -416,6 +463,15 @@ export const styles = StyleSheet.create({
   stepText: { color: colors.text, fontSize: 18, fontWeight: '700' },
   numberInput: { color: colors.text, fontSize: 16, fontWeight: '700', textAlign: 'center', paddingVertical: 6 },
   suffix: { color: colors.muted, fontSize: 13, marginLeft: -4, marginRight: 2 },
+  selectList: {
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  selectOption: { paddingHorizontal: space.md, paddingVertical: 12 },
   input: {
     backgroundColor: colors.surface2,
     borderRadius: radius.sm,

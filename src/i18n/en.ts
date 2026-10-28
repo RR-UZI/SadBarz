@@ -460,6 +460,7 @@ export const en: Record<StringKey, string> = {
   'onb.compete.last': 'Your last result',
   'onb.compete.lastPlaceholder': 'E.g. Califest 2025 · 14:20 · 6th place',
   'onb.compete.weakest': 'Which exercise is hardest for you in competition?',
+  'onb.compete.weakestPick': 'Choose an exercise',
   'category.beginner': 'Beginner',
   'category.intermediate': 'Intermediate',
   'category.advanced': 'Advanced',

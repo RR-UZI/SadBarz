@@ -3,7 +3,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { Calendar, Option, Title, longDate } from '../components/onboarding';
-import { Card, Chip, Field, NumberField, Row, Txt } from '../components/ui';
+import { Card, Chip, Field, NumberField, Row, Select, Txt } from '../components/ui';
 import { COMPETITIONS } from '../data/seed';
 import { useT, type StringKey } from '../i18n';
 import { HOLD_MOVES, LIFTS, SKILL_MINUTES, SKILL_MOVES, STATIC_STAGES } from '../lib/questionnaire';
@@ -322,11 +322,7 @@ function Compete({ details, onChange }: Part) {
       <Label text={t('onb.compete.last')} optional />
       <Field label="" value={c.lastResult ?? ''} onChangeText={(lastResult) => set({ lastResult })} placeholder={t('onb.compete.lastPlaceholder')} />
       <Label text={t('onb.compete.weakest')} optional />
-      <Row style={{ flexWrap: 'wrap' }}>
-        {WEAK.map((w) => (
-          <Chip key={w} label={t(`weak.${w}`)} active={c.weakest === w} onPress={() => set({ weakest: c.weakest === w ? undefined : w })} />
-        ))}
-      </Row>
+      <Select value={c.weakest} options={WEAK.map((w) => ({ value: w, label: t(`weak.${w}`) }))} onChange={(weakest) => set({ weakest })} placeholder={t('onb.compete.weakestPick')} />
     </>
   );
 }
