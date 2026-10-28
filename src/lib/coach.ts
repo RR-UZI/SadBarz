@@ -106,6 +106,7 @@ export interface ReviewItem {
 
 export interface ReviewPlan extends ReviewItem {
   startDate: string | null;
+  code: string | null; // other athletes redeem it to get the plan's routines (only admins can read it)
   input: PlanInput;
   plan: CoachPlan | null;
   approvedPlan: CoachPlan | null;
@@ -145,11 +146,14 @@ export async function loadPlan(id: string): Promise<ReviewPlan | null> {
   if (error) throw error;
   if (!data) return null;
   const input = (data.input ?? {}) as PlanInput;
+  // Codes are only readable through plan_code(), which answers admins only.
+  const code = data.status === 'approved' ? await supabase.rpc('plan_code', { plan_id: id }).then((r) => (r.data as string | null) ?? null) : null;
   return {
     id: data.id,
     status: data.status,
     weeks: data.weeks,
     startDate: data.start_date,
+    code,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     name: input.athlete?.name,
@@ -276,5 +280,44 @@ export function planTiming(plan: MyPlan, today: string) {
     week: Math.min(plan.weeks, Math.max(1, Math.floor(sinceStart / 7) + 1)),
     daysLeft: Math.max(0, Math.min(total, total - sinceStart)), // today included
     endDate: `${end.getUTCFullYear()}-${String(end.getUTCMonth() + 1).padStart(2, '0')}-${String(end.getUTCDate()).padStart(2, '0')}`,
+  };
+}
+
+// ---------- Plan codes ----------
+// Every plan has a code (SB-7K4QXM) that only Uzi sees and hands out. Redeeming one adds that plan's routines to Rutinas.
+// The server checks the limit: Free 1 code a month, Pro as many as they like.
+
+export type RedeemError = 'not_found' | 'limit' | 'auth' | 'offline' | 'failed';
+
+export interface Redeemed {
+  code: string;
+  weeks: PlanWeeks;
+  progression: string;
+  days: { day: number; routine: Routine }[];
+  /** The exercises the routines use, so ones the redeemer doesn't have can be added. */
+  exercises: Exercise[];
+}
+
+export type RedeemResult = { ok: true; plan: Redeemed } | { ok: false; error: RedeemError; next?: string };
+
+export async function redeemCode(code: string): Promise<RedeemResult> {
+  if (!supabase) return { ok: false, error: 'offline' };
+  const { data, error } = await supabase.rpc('redeem_plan_code', { plan_code: code });
+  if (error) return { ok: false, error: 'failed' };
+  const answer = (data ?? {}) as Partial<Redeemed> & { error?: string; next?: string };
+  if (answer.error) {
+    const known: RedeemError[] = ['not_found', 'limit', 'auth'];
+    return { ok: false, error: known.includes(answer.error as RedeemError) ? (answer.error as RedeemError) : 'failed', next: answer.next };
+  }
+  if (!answer.code || !Array.isArray(answer.days)) return { ok: false, error: 'failed' };
+  return {
+    ok: true,
+    plan: {
+      code: answer.code,
+      weeks: answer.weeks ?? 1,
+      progression: answer.progression ?? '',
+      days: [...answer.days].sort((a, b) => a.day - b.day),
+      exercises: Array.isArray(answer.exercises) ? answer.exercises : [],
+    },
   };
 }

@@ -37,6 +37,7 @@ export function RoutineDetailScreen({ id }: { id: string }) {
       id: uid('rt'),
       name: `${routine.name} (${t('common.copy')})`,
       example: false,
+      fromCode: undefined, // a copy is the athlete's own routine, so it counts toward the limit
       blocks: routine.blocks.map(cloneBlock),
       createdAt: now,
       updatedAt: now,
@@ -57,7 +58,7 @@ export function RoutineDetailScreen({ id }: { id: string }) {
           {routine.blocks.length} {t('routines.blocks')}
           {timed > 0 ? ` · ~${clock(timed)}` : ''}
         </Txt>
-        {routine.example ? <Badge label={t('common.example')} /> : null}
+        {routine.example ? <Badge label={t('common.example')} /> : routine.fromCode ? <Badge label={routine.fromCode} /> : null}
       </Row>
       {routine.note ? (
         <Txt color={colors.muted} style={{ marginTop: space.sm }}>

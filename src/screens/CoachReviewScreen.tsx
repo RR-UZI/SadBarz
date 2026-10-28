@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 
+import { PlanCodeCard } from '../components/PlanCode';
 import { Badge, Button, Card, Field, Row, Screen, Section, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
 import {
@@ -251,6 +252,7 @@ export function CoachPlanScreen({ id }: { id: string }) {
           {t('review.approvedNote')}
         </Txt>
       ) : null}
+      {plan.status === 'approved' && plan.code ? <PlanCodeCard code={plan.code} body={t('code.adminBody')} style={{ marginTop: space.md }} /> : null}
       {plan.status === 'failed' ? (
         <Txt color={colors.danger} style={{ marginTop: space.md }}>
           {t('review.failedNote', { e: plan.error ?? '' })}
