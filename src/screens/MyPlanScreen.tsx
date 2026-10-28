@@ -42,6 +42,11 @@ export function useMyPlan() {
       off();
     };
   }, [userId]);
+  // Exercises the coach created for the plan exist only in his account: add them here so the routines show their names.
+  const { exercises, addExercise } = useApp();
+  useEffect(() => {
+    plan?.exercises?.filter((e) => !exercises.some((x) => x.id === e.id)).forEach(addExercise);
+  }, [plan, exercises, addExercise]);
   return plan;
 }
 

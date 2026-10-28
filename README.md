@@ -80,6 +80,7 @@ Setup, once:
 
 1. Run `supabase/migrations/20261027000000_coach_plans.sql` in the SQL Editor.
    Then `supabase/migrations/20261028000000_plan_codes.sql` (plan codes).
+   Then `supabase/migrations/20261029000000_plan_coach_exercises.sql` (adds the coach's own exercises to plans approved before the app did it).
 2. **Edge Functions → Secrets**: `ANTHROPIC_API_KEY` (never in the app or the repo).
 3. **Edge Functions → Deploy a new function → Via Editor**, name it `coach-plan`, paste `supabase/functions/coach-plan/index.ts`, deploy. The function checks the athlete's session itself, so if every call fails with "Invalid JWT" (projects on the new signing keys), turn "Verify JWT" off for it. With the Supabase CLI instead: `supabase functions deploy coach-plan`.
 

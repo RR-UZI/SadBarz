@@ -277,7 +277,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const addExercise = useCallback((e: Exercise) => {
-    setData((d) => ({ ...d, exercises: [...d.exercises, { ...e, custom: true }] }));
+    // Skips one already there, so two screens adding the same exercise don't make a copy.
+    setData((d) => (d.exercises.some((x) => x.id === e.id) ? d : { ...d, exercises: [...d.exercises, { ...e, custom: true }] }));
   }, []);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
