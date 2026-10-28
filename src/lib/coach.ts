@@ -106,7 +106,7 @@ export interface ReviewItem {
 
 export interface ReviewPlan extends ReviewItem {
   startDate: string | null;
-  code: string | null; // other athletes redeem it to get the plan's routines
+  code: string | null; // other athletes redeem it to get the plan's routines (only admins can read it)
   input: PlanInput;
   plan: CoachPlan | null;
   approvedPlan: CoachPlan | null;
@@ -140,18 +140,20 @@ export async function loadPlan(id: string): Promise<ReviewPlan | null> {
   if (!supabase) return null;
   const { data, error } = await supabase
     .from('coach_plans')
-    .select('id, status, weeks, start_date, created_at, updated_at, input, plan, approved_plan, review_note, error, code')
+    .select('id, status, weeks, start_date, created_at, updated_at, input, plan, approved_plan, review_note, error')
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
   if (!data) return null;
   const input = (data.input ?? {}) as PlanInput;
+  // Codes are only readable through plan_code(), which answers admins only.
+  const code = data.status === 'approved' ? await supabase.rpc('plan_code', { plan_id: id }).then((r) => (r.data as string | null) ?? null) : null;
   return {
     id: data.id,
     status: data.status,
     weeks: data.weeks,
     startDate: data.start_date,
-    code: data.code ?? null,
+    code,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
     name: input.athlete?.name,
@@ -206,7 +208,6 @@ export interface MyPlan {
   weeks: PlanWeeks;
   startDate: string; // YYYY-MM-DD, the first day of week 1
   progression: string;
-  code?: string; // to share it: other athletes redeem it in Rutinas
   /** One routine per training day (0 = Monday), in day order. */
   days: { day: number; routine: Routine }[];
 }
@@ -216,7 +217,7 @@ const myPlanKey = (userId: string) => `sadbarz:my-plan:${userId}`;
 const PREVIEW_PLAN_KEY = 'sadbarz:preview-plan';
 const memo = new Map<string, MyPlan | null>();
 
-function toMyPlan(row: { id: string; weeks: PlanWeeks; start_date: string | null; created_at: string; code?: string | null; plan: CoachPlan | null; approved_plan: CoachPlan | null }): MyPlan | null {
+function toMyPlan(row: { id: string; weeks: PlanWeeks; start_date: string | null; created_at: string; plan: CoachPlan | null; approved_plan: CoachPlan | null }): MyPlan | null {
   const plan = row.approved_plan ?? row.plan;
   if (!plan?.days?.length) return null;
   return {
@@ -224,7 +225,6 @@ function toMyPlan(row: { id: string; weeks: PlanWeeks; start_date: string | null
     weeks: row.weeks,
     startDate: row.start_date ?? row.created_at.slice(0, 10),
     progression: plan.progression ?? '',
-    code: row.code ?? undefined,
     days: [...plan.days]
       .sort((a, b) => a.day - b.day)
       // A stable id per plan and day, so the workouts done can be matched to the plan's days.
@@ -248,7 +248,7 @@ export async function myPlan(userId: string): Promise<MyPlan | null> {
   if (!supabase) return cachedPlan(userId);
   const { data, error } = await supabase
     .from('coach_plans')
-    .select('id, weeks, start_date, created_at, code, plan, approved_plan')
+    .select('id, weeks, start_date, created_at, plan, approved_plan')
     // Admins can read every plan, so ask for this user's own.
     .eq('user_id', userId)
     .eq('status', 'approved')
@@ -284,7 +284,7 @@ export function planTiming(plan: MyPlan, today: string) {
 }
 
 // ---------- Plan codes ----------
-// Every plan has a code (SB-7K4QXM). Redeeming one adds that plan's routines to Rutinas.
+// Every plan has a code (SB-7K4QXM) that only Uzi sees and hands out. Redeeming one adds that plan's routines to Rutinas.
 // The server checks the limit: Free 1 code a month, Pro as many as they like.
 
 export type RedeemError = 'not_found' | 'limit' | 'auth' | 'offline' | 'failed';

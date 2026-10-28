@@ -74,7 +74,7 @@ A Pro athlete with a complete profile picks a plan length on Home (1 week, 2 wee
 
 **Mi plan.** Once approved, the athlete gets a "Mi plan" card at the top of Home: today's routine with a Start button (or "Hoy toca descanso" and the next day), the week of the plan and the days left. "Ver mi plan" opens the whole week: tap a day to see and start its routine, a ✓ marks days done this week, and the coach's progression note is at the bottom. It shows Uzi's edited version when there is one, and it's kept on the device so it opens with no signal.
 
-**Plan codes.** Every plan gets a code like `SB-7K4QXM`. Uzi sees it on an approved plan in his review, and the athlete sees it at the bottom of Mi plan to share it. Anyone who redeems it in Rutinas ("¿Tienes un código de plan? Canjéalo") gets that plan's routines, as Uzi approved them, plus any of the original athlete's own exercises they use. Free accounts redeem 1 code per calendar month (Mexico City time), Pro and admins as many as they like; the server function `redeem_plan_code` checks it, so the app can't skip it. Redeeming the same code again doesn't count. Routines from codes carry a badge with the code and, like the examples, don't count toward the free limit (a duplicate of one does).
+**Plan codes.** Every plan gets a code like `SB-7K4QXM`. For now only Uzi's account sees it: on an approved plan in his review, with a Copy button, so he decides who gets it (the server keeps the `code` column out of what athletes can read; admins get it through `plan_code()`). Anyone who redeems it in Rutinas ("¿Tienes un código de plan? Canjéalo") gets that plan's routines, as Uzi approved them, plus any of the original athlete's own exercises they use. Free accounts redeem 1 code per calendar month (Mexico City time), Pro and admins as many as they like; the server function `redeem_plan_code` checks it, so the app can't skip it. Redeeming the same code again doesn't count. Routines from codes carry a badge with the code and, like the examples, don't count toward the free limit (a duplicate of one does).
 
 Setup, once:
 
@@ -113,6 +113,23 @@ Check it locally with `deno check supabase/functions/coach-plan/index.ts` (the a
 | `src/screens/` | Home, Routines, Editor, Workout, Timers, History, Profile, Settings, Auth, Onboarding |
 | `src/lib/profile.ts` | Onboarding helpers: starting level from the max reps test, next training day |
 | `src/i18n/` | Spanish and English text |
+
+## Later: professional coaches
+
+Ideas Uzi wants to build on top of plan codes. Nothing here exists yet.
+
+**Coaches who share their own routines.** Besides Uzi, verified professional coaches get a coach account (`app_metadata.coach = true`, set only by the server, like `admin`). A coach:
+- builds routines or full weekly plans in the app with the normal editor (no AI needed, or the AI coach as a starting point they edit),
+- gets a code for each one and shares it with their followers (Instagram, WhatsApp, a QR at the gym),
+- sees how many people redeemed each code.
+
+Followers redeem a coach's code exactly like Uzi's today (same Free and Pro limits), and the routines show the coach's name. What it needs: a `coach_routines` table (owner, title, routines, code, published or not), `redeem_plan_code` reading from it as well as from `coach_plans`, a coach profile (name, photo, social link), and a simple "Mis códigos" screen for coaches. Uzi approves who becomes a coach.
+
+**Subscribing to one coach.** An athlete pays a monthly subscription to a specific coach and gets everything that coach publishes, and new plans as they come, with no code needed. What it needs:
+- payments through Stripe (the app's own Pro subscription is step 8). Paying a coach their share needs Stripe Connect: each coach connects a Stripe account, SadBarz keeps a percentage and Stripe pays the coach.
+- a `coach_subscriptions` table (athlete, coach, status, renews on) kept up to date by Stripe webhooks in an Edge Function, never by the app.
+- a coach page in the app (bio, what they publish, price, "Suscribirme"), and in Rutinas a section per coach the athlete follows.
+- open questions for Uzi: does a coach subscription include SadBarz Pro, or is it separate? Who sets the price (the coach, within a range)? What happens to the routines when a subscription ends (keep the ones already added, or remove them)?
 
 ## Notes
 

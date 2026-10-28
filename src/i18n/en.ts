@@ -629,7 +629,6 @@ export const en: Record<StringKey, string> = {
   'code.copy': 'Copy',
   'code.copied': 'Copied ✓',
   'code.share': 'Share',
-  'code.ownerBody': "Share it: whoever redeems it in Routines gets your plan's routines.",
   'code.adminBody': 'Other athletes redeem it in Routines and get these routines, as you approved them.',
   'code.redeem': 'Have a plan code? Redeem it',
   'code.redeemTitle': 'Redeem a code',

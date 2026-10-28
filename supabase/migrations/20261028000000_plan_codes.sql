@@ -1,8 +1,9 @@
--- Plan codes: every coach plan gets a code like SB-7K4QXM. Another athlete who
--- redeems it gets that plan's routines in Rutinas (as Uzi approved them).
+-- Plan codes: every coach plan gets a code like SB-7K4QXM. Only Uzi (admins) can
+-- see it; an athlete who redeems it gets that plan's routines in Rutinas (as Uzi
+-- approved them).
 -- Free accounts redeem 1 code per calendar month (Mexico City time), Pro and
 -- admins as many as they like. The check runs here on the server, so the app
--- can't skip it. Run this whole file once in the SQL Editor.
+-- can't skip it. Run this whole file in the SQL Editor (running it again is safe).
 
 alter table public.coach_plans add column if not exists code text;
 create unique index if not exists coach_plans_code on public.coach_plans (code);
@@ -26,6 +27,22 @@ end $$;
 
 alter table public.coach_plans alter column code set default public.new_plan_code();
 update public.coach_plans set code = public.new_plan_code() where code is null;
+
+-- For now only Uzi (admins) sees codes. Athletes can read their approved plans,
+-- so the code column is left out of what the app may read, and admins get it
+-- through plan_code() below. A column added to coach_plans later must be added
+-- to this list for the app to read it.
+revoke select on public.coach_plans from authenticated;
+grant select (id, user_id, status, weeks, start_date, input, plan, approved_plan, review_note, reviewed_by, reviewed_at, model, usage, error, created_at, updated_at)
+  on public.coach_plans to authenticated;
+
+create or replace function public.plan_code(plan_id uuid) returns text
+language sql stable security definer set search_path = '' as $$
+  select p.code from public.coach_plans p where p.id = plan_id and public.is_admin()
+$$;
+
+revoke all on function public.plan_code(uuid) from public, anon;
+grant execute on function public.plan_code(uuid) to authenticated;
 
 -- Who redeemed which plan, and when (the monthly limit counts these).
 create table if not exists public.plan_redemptions (

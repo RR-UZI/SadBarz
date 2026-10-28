@@ -1,4 +1,4 @@
-// Plan codes: the card that shows a plan's code to share it, and the one in
+// Plan codes: the card where Uzi sees a plan's code to share it, and the one in
 // Rutinas where an athlete redeems a code to get that plan's routines.
 import React, { useState } from 'react';
 import { Platform, Share, Text, View } from 'react-native';

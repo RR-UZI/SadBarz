@@ -628,7 +628,6 @@ export const es = {
   'code.copy': 'Copiar',
   'code.copied': 'Copiado ✓',
   'code.share': 'Compartir',
-  'code.ownerBody': 'Compártelo: quien lo canjee en Rutinas recibe las rutinas de tu plan.',
   'code.adminBody': 'Otros atletas lo canjean en Rutinas y reciben estas rutinas, como las aprobaste.',
   'code.redeem': '¿Tienes un código de plan? Canjéalo',
   'code.redeemTitle': 'Canjear código',
