@@ -185,7 +185,7 @@ export const es = {
   'history.blocks': '{done} de {total} bloques',
   'history.today': 'Hoy',
   'history.yesterday': 'Ayer',
-  'history.viewRoutine': 'Ver rutina',
+  'history.viewSummary': 'Ver resumen',
   'history.close': 'Cerrar',
 
   'settings.title': 'Ajustes',

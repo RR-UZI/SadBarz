@@ -186,7 +186,7 @@ export const en: Record<StringKey, string> = {
   'history.blocks': '{done} of {total} blocks',
   'history.today': 'Today',
   'history.yesterday': 'Yesterday',
-  'history.viewRoutine': 'See routine',
+  'history.viewSummary': 'See summary',
   'history.close': 'Close',
 
   'settings.title': 'Settings',

@@ -87,13 +87,13 @@ export function HistoryScreen() {
   );
 }
 
-// Opens on the same summary the athlete saw when they finished; "Ver rutina" pops up every block with what was logged.
+// Shows every block with what was logged; "Ver resumen" pops up the same summary the athlete saw when they finished.
 export function WorkoutDetailScreen({ id }: { id: string }) {
   const t = useT();
   const nav = useNav();
-  const { workouts, deleteWorkout } = useApp();
+  const { workouts, exerciseById, deleteWorkout } = useApp();
   const dayLabel = useDayLabel();
-  const [showBlocks, setShowBlocks] = useState(false);
+  const [showSummary, setShowSummary] = useState(false);
   const w = workouts.find((x) => x.id === id);
   if (!w) {
     return (
@@ -102,19 +102,9 @@ export function WorkoutDetailScreen({ id }: { id: string }) {
       </Screen>
     );
   }
-  const done = w.blocks.filter((b) => b.status === 'done');
-  const reps = done.reduce((s, b) => s + totalReps(b.entries), 0);
-  // One row per block, in the order they were first logged; done wins over skipped when a block was repeated.
-  const rows: { blockId: string; title: string; status: 'done' | 'skipped' }[] = [];
-  for (const b of w.blocks) {
-    const row = rows.find((r) => r.blockId === b.blockId);
-    if (!row) rows.push({ blockId: b.blockId, title: b.title || b.format.toUpperCase(), status: b.status });
-    else if (b.status === 'done') row.status = 'done';
-  }
-  const total = w.totalBlocks ?? rows.length;
   return (
     <Screen
-      title={t('run.summary')}
+      title={w.routineName}
       onBack={nav.pop}
       footer={
         <Row>
@@ -134,38 +124,72 @@ export function WorkoutDetailScreen({ id }: { id: string }) {
               )
             }
           />
-          <Button label={t('history.viewRoutine')} flex onPress={() => setShowBlocks(true)} />
+          <Button label={t('history.viewSummary')} flex onPress={() => setShowSummary(true)} />
         </Row>
       }
     >
-      <View style={{ alignItems: 'center', marginBottom: space.md }}>
-        <LogoMark size={80} />
-      </View>
-      <Txt variant="title" style={{ textAlign: 'center' }}>
-        {w.routineName}
+      <Txt color={colors.muted}>
+        {dayLabel(w.startedAt)} · {new Date(w.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} · {clock((w.finishedAt - w.startedAt) / 1000)}
       </Txt>
-      <Txt color={colors.muted} style={{ textAlign: 'center', marginTop: 4 }}>
-        {dayLabel(w.startedAt)} · {new Date(w.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-      </Txt>
-      <Row style={{ justifyContent: 'space-around', marginTop: space.xl }}>
-        <Stat label={t('run.totalTime')} value={clock((w.finishedAt - w.startedAt) / 1000)} />
-        <Stat label={t('run.blocksDone')} value={`${new Set(done.map((b) => b.blockId)).size}/${total}`} />
-        <Stat label={t('run.totalReps')} value={String(reps)} />
-      </Row>
-      <View style={{ gap: space.sm, marginTop: space.xl }}>
-        {rows.map((r, i) => (
-          <BlockStatusRow key={r.blockId} index={i} title={r.title} status={r.status} />
+      <View style={{ gap: space.md, marginTop: space.lg }}>
+        {w.blocks.map((b, i) => (
+          <Card key={i} style={b.status === 'skipped' ? { opacity: 0.6 } : undefined}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Txt style={{ fontWeight: '800', flex: 1 }}>{b.title || b.format.toUpperCase()}</Txt>
+              <Badge
+                label={t(`run.status.${b.status}`)}
+                color={b.status === 'done' ? colors.success : colors.warn}
+                textColor={colors.accentText}
+              />
+            </Row>
+            {b.durationSec ? (
+              <Txt variant="small" color={colors.muted} style={{ marginTop: 2 }}>
+                {clock(b.durationSec)}
+              </Txt>
+            ) : null}
+            {b.score ? (
+              <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
+                {`AMRAP · ${t('run.score', { rounds: b.score.rounds, reps: b.score.reps })}`}
+              </Txt>
+            ) : null}
+            {b.forTime ? (
+              <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
+                {`For time · ${forTimeText(t, b.forTime)}`}
+              </Txt>
+            ) : null}
+            <View style={{ marginTop: space.sm, gap: 2 }}>
+              {b.entries.map((e, j) => (
+                <Txt key={j} variant="small">
+                  {e.rounds} x {e.reps ?? ''}
+                  {e.seconds ? `${e.seconds}"` : ''}
+                  {e.meters ? `${e.meters} m` : ''}
+                  {e.calories ? `${e.calories} cal` : ''} {exerciseById(e.exerciseId)?.name ?? '?'}
+                  {e.weightKg ? <Txt variant="small" color={colors.accent}>{` +${e.weightKg}kg`}</Txt> : null}
+                </Txt>
+              ))}
+            </View>
+          </Card>
         ))}
       </View>
-      <WorkoutBlocksSheet workout={w} visible={showBlocks} onClose={() => setShowBlocks(false)} />
+      <SummaryPopup workout={w} visible={showSummary} onClose={() => setShowSummary(false)} />
     </Screen>
   );
 }
 
-function WorkoutBlocksSheet({ workout: w, visible, onClose }: { workout: Workout; visible: boolean; onClose: () => void }) {
+function SummaryPopup({ workout: w, visible, onClose }: { workout: Workout; visible: boolean; onClose: () => void }) {
   const t = useT();
-  const { exerciseById } = useApp();
+  const dayLabel = useDayLabel();
   const insets = useSafeAreaInsets();
+  const done = w.blocks.filter((b) => b.status === 'done');
+  const reps = done.reduce((s, b) => s + totalReps(b.entries), 0);
+  // One row per block, in the order they were first logged; done wins over skipped when a block was repeated.
+  const rows: { blockId: string; title: string; status: 'done' | 'skipped' }[] = [];
+  for (const b of w.blocks) {
+    const row = rows.find((r) => r.blockId === b.blockId);
+    if (!row) rows.push({ blockId: b.blockId, title: b.title || b.format.toUpperCase(), status: b.status });
+    else if (b.status === 'done') row.status = 'done';
+  }
+  const total = w.totalBlocks ?? rows.length;
   return (
     <Modal visible={visible} animationType="fade" onRequestClose={onClose} transparent>
       <View
@@ -192,50 +216,31 @@ function WorkoutBlocksSheet({ workout: w, visible, onClose }: { workout: Workout
           }}
         >
           <Row style={{ justifyContent: 'space-between', padding: space.lg }}>
-            <Txt variant="h2" style={{ flex: 1 }} numberOfLines={1}>
-              {w.routineName}
+            <Txt variant="h2" style={{ flex: 1 }}>
+              {t('run.summary')}
             </Txt>
             <Button label={t('history.close')} size="sm" variant="ghost" onPress={onClose} />
           </Row>
-          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.lg }}>
-            {w.blocks.map((b, i) => (
-              <Card key={i} style={b.status === 'skipped' ? { opacity: 0.6 } : undefined}>
-                <Row style={{ justifyContent: 'space-between' }}>
-                  <Txt style={{ fontWeight: '800', flex: 1 }}>{b.title || b.format.toUpperCase()}</Txt>
-                  <Badge
-                    label={t(`run.status.${b.status}`)}
-                    color={b.status === 'done' ? colors.success : colors.warn}
-                    textColor={colors.accentText}
-                  />
-                </Row>
-                {b.durationSec ? (
-                  <Txt variant="small" color={colors.muted} style={{ marginTop: 2 }}>
-                    {clock(b.durationSec)}
-                  </Txt>
-                ) : null}
-                {b.score ? (
-                  <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
-                    {`AMRAP · ${t('run.score', { rounds: b.score.rounds, reps: b.score.reps })}`}
-                  </Txt>
-                ) : null}
-                {b.forTime ? (
-                  <Txt style={{ fontWeight: '800', marginTop: 2 }} color={colors.accent}>
-                    {`For time · ${forTimeText(t, b.forTime)}`}
-                  </Txt>
-                ) : null}
-                <View style={{ marginTop: space.sm, gap: 2 }}>
-                  {b.entries.map((e, j) => (
-                    <Txt key={j} variant="small">
-                      {e.rounds} x {e.reps ?? ''}
-                      {e.seconds ? `${e.seconds}"` : ''}
-                      {e.meters ? `${e.meters} m` : ''}
-                      {e.calories ? `${e.calories} cal` : ''} {exerciseById(e.exerciseId)?.name ?? '?'}
-                      {e.weightKg ? <Txt variant="small" color={colors.accent}>{` +${e.weightKg}kg`}</Txt> : null}
-                    </Txt>
-                  ))}
-                </View>
-              </Card>
-            ))}
+          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+            <View style={{ alignItems: 'center', marginBottom: space.md }}>
+              <LogoMark size={64} />
+            </View>
+            <Txt variant="title" style={{ textAlign: 'center' }}>
+              {w.routineName}
+            </Txt>
+            <Txt color={colors.muted} style={{ textAlign: 'center', marginTop: 4 }}>
+              {dayLabel(w.startedAt)} · {new Date(w.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+            </Txt>
+            <Row style={{ justifyContent: 'space-around', marginTop: space.xl }}>
+              <Stat label={t('run.totalTime')} value={clock((w.finishedAt - w.startedAt) / 1000)} />
+              <Stat label={t('run.blocksDone')} value={`${new Set(done.map((b) => b.blockId)).size}/${total}`} />
+              <Stat label={t('run.totalReps')} value={String(reps)} />
+            </Row>
+            <View style={{ gap: space.sm, marginTop: space.xl }}>
+              {rows.map((r, i) => (
+                <BlockStatusRow key={r.blockId} index={i} title={r.title} status={r.status} />
+              ))}
+            </View>
           </ScrollView>
         </View>
       </View>
