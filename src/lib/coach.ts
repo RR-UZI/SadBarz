@@ -182,23 +182,31 @@ export function planExerciseIds(plan: CoachPlan): Set<string> {
  */
 export async function approvePlan(plan: ReviewPlan, reviewer: string, edited: CoachPlan | null, mine: Exercise[]): Promise<void> {
   if (!supabase) return;
-  const week = edited ?? plan.plan;
-  const have = new Set((plan.input.exercises ?? []).map((e) => e.id));
-  const used = week ? planExerciseIds(week) : new Set<string>();
-  const extra = mine.filter((e) => e.custom && used.has(e.id) && !have.has(e.id)).map(({ id, name, kind, category }) => ({ id, name, kind, category }));
   const now = new Date().toISOString();
   const { error } = await supabase
     .from('coach_plans')
-    .update({
-      status: 'approved',
-      approved_plan: edited,
-      reviewed_by: reviewer,
-      reviewed_at: now,
-      updated_at: now,
-      ...(extra.length ? { input: { ...plan.input, exercises: [...(plan.input.exercises ?? []), ...extra] } } : null),
-    })
+    .update({ status: 'approved', approved_plan: edited, reviewed_by: reviewer, reviewed_at: now, updated_at: now, ...withCoachExercises(plan, edited ?? plan.plan, mine) })
     .eq('id', plan.id);
   if (error) throw error;
+}
+
+/** Fix an approved plan: the athlete sees the new version next time the app loads it. Copies already redeemed by code stay as they were. */
+export async function saveApprovedEdits(plan: ReviewPlan, edited: CoachPlan, mine: Exercise[]): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase
+    .from('coach_plans')
+    .update({ approved_plan: edited, updated_at: new Date().toISOString(), ...withCoachExercises(plan, edited, mine) })
+    .eq('id', plan.id)
+    .eq('status', 'approved');
+  if (error) throw error;
+}
+
+// The input update that lists the coach's own exercises the week uses, if any are missing.
+function withCoachExercises(plan: ReviewPlan, week: CoachPlan | null, mine: Exercise[]) {
+  const have = new Set((plan.input.exercises ?? []).map((e) => e.id));
+  const used = week ? planExerciseIds(week) : new Set<string>();
+  const extra = mine.filter((e) => e.custom && used.has(e.id) && !have.has(e.id)).map(({ id, name, kind, category }) => ({ id, name, kind, category }));
+  return extra.length ? { input: { ...plan.input, exercises: [...(plan.input.exercises ?? []), ...extra] } } : null;
 }
 
 /** Send it back with a note: the coach writes it again following the note. */

@@ -702,6 +702,10 @@ export const en: Record<StringKey, string> = {
   'review.writing': 'The coach is writing this version. It takes a minute or two.',
   'review.lastNote': 'Your note',
   'review.approvedNote': 'Approved. The athlete can see it now.',
+  'review.saveFix': 'Save changes',
+  'review.saving': 'Saving…',
+  'review.discard': 'Discard',
+  'review.fixNote': "The athlete sees the new version next time they open the app. People who already redeemed the code keep the old version.",
   'review.failedNote': 'This plan failed: {e}',
   'review.saveError': 'Could not save. Try again.',
 };

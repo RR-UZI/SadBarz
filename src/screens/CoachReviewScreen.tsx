@@ -12,6 +12,7 @@ import {
   onPlansChanged,
   plansChanged,
   reviewList,
+  saveApprovedEdits,
   sendBack,
   type CoachPlan,
   type CoachStatus,
@@ -165,6 +166,8 @@ export function CoachPlanScreen({ id }: { id: string }) {
 
   const week = edited ?? plan.approvedPlan ?? plan.plan;
   const canReview = plan.status === 'review';
+  // An approved plan can still be fixed: edits stay here until Uzi saves them.
+  const canFix = plan.status === 'approved';
   const names = Object.fromEntries((plan.input.exercises ?? []).map((e) => [e.id, e.name]));
 
   const editDay = (index: number, routine: Routine) => {
@@ -186,6 +189,22 @@ export function CoachPlanScreen({ id }: { id: string }) {
       edits.delete(id);
       plansChanged();
       nav.pop();
+    } catch (e) {
+      setProblem(`${t('review.saveError')} ${e instanceof Error ? e.message : ''}`.trim());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveFix = async () => {
+    if (!edited) return;
+    setBusy(true);
+    setProblem(null);
+    try {
+      await saveApprovedEdits(plan, edited, exercises);
+      setEdited(null);
+      plansChanged();
+      refresh();
     } catch (e) {
       setProblem(`${t('review.saveError')} ${e instanceof Error ? e.message : ''}`.trim());
     } finally {
@@ -234,6 +253,21 @@ export function CoachPlanScreen({ id }: { id: string }) {
                 <Button label={edited ? t('review.approveEdited') : t('review.approve')} flex onPress={approve} disabled={busy || !week} />
               </Row>
             )}
+          </View>
+        ) : canFix && edited ? (
+          <View style={{ gap: space.sm }}>
+            {problem ? (
+              <Txt variant="small" color={colors.danger}>
+                {problem}
+              </Txt>
+            ) : null}
+            <Txt variant="small" color={colors.muted}>
+              {t('review.fixNote')}
+            </Txt>
+            <Row>
+              <Button label={t('review.discard')} variant="secondary" flex onPress={() => setEdited(null)} disabled={busy} />
+              <Button label={busy ? t('review.saving') : t('review.saveFix')} flex onPress={saveFix} disabled={busy} />
+            </Row>
           </View>
         ) : undefined
       }
@@ -290,7 +324,7 @@ export function CoachPlanScreen({ id }: { id: string }) {
             <Section
               key={d.routine.id}
               title={t(`dayLong.${d.day}` as StringKey)}
-              right={canReview ? <Button label={t('common.edit')} size="sm" variant="ghost" onPress={() => editDay(i, d.routine)} /> : undefined}
+              right={canReview || canFix ? <Button label={t('common.edit')} size="sm" variant="ghost" onPress={() => editDay(i, d.routine)} /> : undefined}
             >
               <Card>
                 <Txt style={{ fontWeight: '800' }}>{d.routine.name}</Txt>
