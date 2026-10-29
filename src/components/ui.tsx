@@ -15,7 +15,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useT } from '../i18n';
 import { clampInt } from '../lib/util';
+import { useNav } from '../navigation';
 import { colors, font, radius, space } from '../theme';
 import { LogoMark } from './Logo';
 
@@ -48,7 +50,7 @@ export function Screen({
                 <Text style={styles.backText}>‹</Text>
               </Pressable>
             ) : mark ? (
-              <LogoMark size={26} />
+              <HomeMark />
             ) : null}
           </View>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -66,6 +68,17 @@ export function Screen({
       )}
       {footer ? <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, space.md) }]}>{footer}</View> : null}
     </View>
+  );
+}
+
+// The SB mark in a tab's header takes you to Inicio.
+function HomeMark() {
+  const t = useT();
+  const nav = useNav();
+  return (
+    <Pressable onPress={() => nav.reset('home')} hitSlop={8} accessibilityRole="button" accessibilityLabel={t('tab.home')}>
+      <LogoMark size={26} />
+    </Pressable>
   );
 }
 
