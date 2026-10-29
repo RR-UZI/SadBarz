@@ -44,7 +44,7 @@ export function RoutinesScreen() {
                   {r.blocks.length} {t('routines.blocks')}
                 </Txt>
               </View>
-              {r.example ? <Badge label={t('common.example')} /> : r.fromCode ? <Badge label={r.fromCode} /> : null}
+              {r.example ? <Badge label={t('common.example')} /> : null}
             </Row>
             <View style={{ marginTop: space.sm, gap: 2 }}>
               {r.blocks.slice(0, 4).map((b) => (
