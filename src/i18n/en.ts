@@ -130,7 +130,7 @@ export const en: Record<StringKey, string> = {
   'run.skipRest': 'Skip rest',
   'run.plus15': '+15 s',
   'run.finishBlock': 'Finish block',
-  'run.tapToStart': 'Tap Start when you are ready',
+  'run.tapToStart': 'Tap Start when you are ready, or tap another block to start there',
   'run.blockFinished': 'Block finished',
   'run.whatNow': 'What now?',
   'run.markDone': 'Done',

@@ -2,7 +2,7 @@
 // ready -> running -> review (Done / Repeat / Skip / Finish) -> break -> ready ... -> summary
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
 import { BlockRunner } from '../components/BlockRunner';
 import { LogoMark } from '../components/Logo';
@@ -83,8 +83,18 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
     return next;
   };
 
+  // The next block with nothing logged, from `from` on, then any left before it (the athlete may have started mid-routine).
+  const nextToDo = (from: number, done: BlockLog[]) => {
+    const todo = (i: number) => !done.some((l) => l.blockId === blocks[i].id);
+    for (let i = from; i < blocks.length; i++) if (todo(i)) return i;
+    for (let i = 0; i < Math.min(from, blocks.length); i++) if (todo(i)) return i;
+    return blocks.length;
+  };
+
   // After a block: go to a break (or straight on), or the summary if nothing is left.
-  const afterBlock = (nextIndex: number, withBreak: boolean) => {
+  // Repeating passes the same index; otherwise it moves to the next block not done yet.
+  const afterBlock = (requested: number, withBreak: boolean, done: BlockLog[]) => {
+    const nextIndex = requested === index ? index : nextToDo(requested, done);
     if (nextIndex >= blocks.length) {
       setPhase({ kind: 'summary' });
       return;
@@ -202,8 +212,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
             label={`✓ ${t('run.markDone')}`}
             size="lg"
             onPress={() => {
-              addLog('done', phase.durationSec, entries);
-              afterBlock(index + 1, true);
+              afterBlock(index + 1, true, addLog('done', phase.durationSec, entries));
             }}
           />
           <Row>
@@ -212,8 +221,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
               variant="secondary"
               flex
               onPress={() => {
-                addLog('done', phase.durationSec, entries);
-                afterBlock(index, true);
+                afterBlock(index, true, addLog('done', phase.durationSec, entries));
               }}
             />
             <Button
@@ -221,8 +229,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
               variant="secondary"
               flex
               onPress={() => {
-                addLog('skipped', phase.durationSec, []);
-                afterBlock(index + 1, false);
+                afterBlock(index + 1, false, addLog('skipped', phase.durationSec, []));
               }}
             />
           </Row>
@@ -342,8 +349,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
               variant="ghost"
               flex
               onPress={() => {
-                addLog('skipped', 0, []);
-                afterBlock(index + 1, false);
+                afterBlock(index + 1, false, addLog('skipped', 0, []));
               }}
             />
             <Button label={t('run.finishWorkout')} variant="ghost" flex onPress={() => setPhase({ kind: 'summary' })} />
@@ -367,7 +373,18 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
       </Txt>
       <View style={{ gap: space.sm, marginTop: space.xl }}>
         {blocks.map((b, i) => (
-          <BlockStatusRow key={b.id} index={i} block={b} status={statusOf(b)} current={i === index} />
+          <BlockStatusRow
+            key={b.id}
+            index={i}
+            block={b}
+            status={statusOf(b)}
+            current={i === index}
+            // Tap a block to start from it instead.
+            onPress={() => {
+              setIndex(i);
+              setPhase({ kind: 'ready' });
+            }}
+          />
         ))}
       </View>
     </Screen>
@@ -387,11 +404,23 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BlockStatusRow({ block, index, status, current }: { block: Block; index: number; status: 'done' | 'skipped' | 'todo'; current?: boolean }) {
+function BlockStatusRow({
+  block,
+  index,
+  status,
+  current,
+  onPress,
+}: {
+  block: Block;
+  index: number;
+  status: 'done' | 'skipped' | 'todo';
+  current?: boolean;
+  onPress?: () => void;
+}) {
   const t = useT();
   const color = status === 'done' ? colors.success : status === 'skipped' ? colors.warn : colors.surface2;
   const textColor = status === 'todo' ? colors.muted : colors.accentText;
-  return (
+  const row = (
     <Row
       style={{
         justifyContent: 'space-between',
@@ -407,6 +436,12 @@ function BlockStatusRow({ block, index, status, current }: { block: Block; index
       </Txt>
       <Badge label={t(`run.status.${status}`)} color={color} textColor={textColor} />
     </Row>
+  );
+  if (!onPress) return row;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityState={{ selected: current }}>
+      {row}
+    </Pressable>
   );
 }
 
