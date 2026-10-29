@@ -129,7 +129,7 @@ export const es = {
   'run.skipRest': 'Saltar descanso',
   'run.plus15': '+15 s',
   'run.finishBlock': 'Terminar bloque',
-  'run.tapToStart': 'Toca Iniciar cuando estés listo',
+  'run.tapToStart': 'Toca Iniciar cuando estés listo, o toca otro bloque para empezar por ahí',
   'run.blockFinished': 'Bloque terminado',
   'run.whatNow': '¿Qué sigue?',
   'run.markDone': 'Hecho',
