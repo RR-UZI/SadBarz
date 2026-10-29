@@ -110,6 +110,16 @@ function Controls({ running, onToggle, onFinish }: { running: boolean; onToggle:
   );
 }
 
+// Back / forward one round (or set), for when the athlete missed or forgot to tap.
+function StepButtons({ back, forward, onBack, onForward, backDisabled }: { back: string; forward: string; onBack: () => void; onForward: () => void; backDisabled?: boolean }) {
+  return (
+    <Row style={{ marginTop: space.md }}>
+      <Button label={`‹ ${back}`} variant="secondary" flex onPress={onBack} disabled={backDisabled} />
+      <Button label={`${forward} ›`} variant="secondary" flex onPress={onForward} />
+    </Row>
+  );
+}
+
 // ---------- EMOM / interval and Tabata ----------
 
 function TimedRunner({ block, onFinish }: Props) {
@@ -169,6 +179,15 @@ function TimedRunner({ block, onFinish }: Props) {
 
   if (finished) return <BigClock seconds={0} color={colors.success} label={t('run.blockFinished')} />;
 
+  // Jump to the start of a round's work; past the last round ends the block.
+  const goRound = (r: number) => {
+    const target = segs.find((s) => s.kind === 'work' && s.round === r);
+    c.reset((target ? target.start : total) * 1000, c.running);
+  };
+  // From a rest, back redoes the round just done; from a round, back goes to the one before.
+  const backRound = seg.kind === 'rest' ? seg.round : Math.max(1, seg.round - 1);
+  const forwardRound = seg.kind === 'leadin' ? 1 : seg.round + 1;
+
   const roundItems = itemsForRound(block, Math.max(1, seg.round));
   const nextRound = seg.kind === 'leadin' ? 1 : seg.round + 1;
   const nextItems = nextRound <= block.rounds ? itemsForRound(block, nextRound) : [];
@@ -196,6 +215,15 @@ function TimedRunner({ block, onFinish }: Props) {
           <Txt variant="label">{t('run.next')}</Txt>
           <ItemLines items={nextItems} dim />
         </View>
+      ) : null}
+      {block.rounds > 1 ? (
+        <StepButtons
+          back={t('common.round')}
+          forward={t('common.round')}
+          onBack={() => goRound(backRound)}
+          onForward={() => goRound(forwardRound)}
+          backDisabled={seg.kind === 'leadin'}
+        />
       ) : null}
       <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={() => onFinish(Math.round(workElapsed))} />
     </View>
@@ -365,6 +393,15 @@ function SetsRunner({ block, onFinish }: Props) {
       <BigClock seconds={sec} color={colors.accent} label={t('run.work')} sub={`${t('common.set')} ${current.setInRow}/${current.setsInRow}`} />
       <ItemLines items={current.items} big />
       <Button label={t('run.setDone')} size="lg" style={{ marginTop: space.xl }} onPress={setDone} />
+      {flat.length > 1 ? (
+        <StepButtons
+          back={t('common.set')}
+          forward={t('common.set')}
+          onBack={() => goWork(i - 1)}
+          onForward={() => (isLast ? finishBlock() : goWork(i + 1))}
+          backDisabled={i === 0}
+        />
+      ) : null}
       <Controls running={phase.running} onToggle={togglePause} onFinish={finishBlock} />
     </View>
   );
@@ -508,7 +545,22 @@ function CircuitRunner({ block, onFinish }: Props) {
         </Row>
       ) : null}
       {phase === 'rest' ? (
-        <Button label={t('run.startRound', { n: round })} size="lg" style={{ marginTop: space.xl }} onPress={startNext} />
+        <>
+          <Button label={t('run.startRound', { n: round })} size="lg" style={{ marginTop: space.xl }} onPress={startNext} />
+          {/* Tapped "round done" by mistake: back to that round, its stopwatch picking up where it stopped. */}
+          <Button
+            label={t('run.undoRound')}
+            variant="ghost"
+            size="sm"
+            style={{ marginTop: space.sm, alignSelf: 'center' }}
+            onPress={() => {
+              setRound(round - 1);
+              setRoundTimes(roundTimes.slice(0, -1));
+              setRoundStart(workSec - lastTime);
+              setPhase('work');
+            }}
+          />
+        </>
       ) : (
         <Button
           label={block.rounds > 1 ? (isLast ? t('run.lastRoundDone') : t('run.roundDoneOf', { n: round, total: block.rounds })) : t('run.roundDone')}
