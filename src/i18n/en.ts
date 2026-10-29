@@ -705,7 +705,7 @@ export const en: Record<StringKey, string> = {
   'review.saveFix': 'Save changes',
   'review.saving': 'Saving…',
   'review.discard': 'Discard',
-  'review.fixNote': "The athlete sees the new version next time they open the app. People who already redeemed the code keep the old version.",
+  'review.fixNote': 'The athlete and everyone who redeemed the code see the new version next time they open the app.',
   'review.failedNote': 'This plan failed: {e}',
   'review.saveError': 'Could not save. Try again.',
 };

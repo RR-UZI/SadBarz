@@ -1,11 +1,11 @@
 // Plan codes: the card where Uzi sees a plan's code to share it, and the one in
 // Rutinas where an athlete redeems a code to get that plan's routines.
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Share, Text, View } from 'react-native';
 
 import { useT } from '../i18n';
 import { cloneBlock } from '../lib/blocks';
-import { redeemCode, type RedeemError } from '../lib/coach';
+import { redeemCode, redeemedPlans, type RedeemError } from '../lib/coach';
 import { uid } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
@@ -99,6 +99,7 @@ export function RedeemCard() {
         blocks: d.routine.blocks.map(cloneBlock),
         example: undefined,
         fromCode: plan.code,
+        codeDay: d.day,
         createdAt: now + i,
         updatedAt: now + i,
       }),
@@ -145,3 +146,53 @@ export function RedeemCard() {
   );
 }
 
+// ---------- Keeping code routines up to date ----------
+
+let lastCheck = 0;
+
+/**
+ * Routines from a code follow the plan: when Uzi fixes the plan, the copies here are replaced with
+ * the new version (same routines, so past workouts stay linked). Checked at most once a minute.
+ */
+export function useCodeRoutineUpdates() {
+  const { user } = useAuth();
+  const { ready, routines, exercises, saveRoutine, deleteRoutine, addExercise } = useApp();
+  const live = useRef({ routines, exercises });
+  live.current = { routines, exercises };
+  const codes = [...new Set(routines.map((r) => r.fromCode).filter((c): c is string => !!c))].sort().join(',');
+
+  useEffect(() => {
+    if (!user || !ready || !codes || Date.now() - lastCheck < 60_000) return;
+    lastCheck = Date.now();
+    redeemedPlans(codes.split(',')).then((plans) => {
+      plans?.forEach((plan) => {
+        const mine = live.current.routines.filter((r) => r.fromCode === plan.code);
+        if (mine.every((r) => r.codeVersion === plan.version)) return;
+        const have = new Set(live.current.exercises.map((e) => e.id));
+        plan.exercises.filter((e) => !have.has(e.id)).forEach((e) => addExercise({ id: e.id, name: e.name, kind: e.kind, category: e.category }));
+        // Copies redeemed before days were stored were added last day first, so newest first is day order.
+        const byDay = new Map(mine.filter((r) => r.codeDay != null).map((r) => [r.codeDay, r]));
+        const older = mine.filter((r) => r.codeDay == null).sort((a, b) => b.createdAt - a.createdAt);
+        const now = Date.now();
+        const kept = new Set<string>();
+        [...plan.days].reverse().forEach((d, i) => {
+          const day = plan.days.length - 1 - i;
+          const current = byDay.get(d.day) ?? older[day];
+          if (current) kept.add(current.id);
+          saveRoutine({
+            ...(current ?? { id: uid('rt'), createdAt: now + i }),
+            name: d.routine.name,
+            note: d.routine.note,
+            blocks: d.routine.blocks.map(cloneBlock),
+            fromCode: plan.code,
+            codeDay: d.day,
+            codeVersion: plan.version,
+            updatedAt: now,
+          });
+        });
+        // Days the plan no longer has.
+        mine.filter((r) => !kept.has(r.id)).forEach((r) => deleteRoutine(r.id));
+      });
+    });
+  }, [user, ready, codes, saveRoutine, deleteRoutine, addExercise]);
+}

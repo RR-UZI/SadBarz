@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, View } from 'react-native';
 
-import { RedeemCard } from '../components/PlanCode';
+import { RedeemCard, useCodeRoutineUpdates } from '../components/PlanCode';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { blockDurationSec, formatLabel, itemTarget, itemTurns } from '../lib/blocks';
@@ -13,6 +13,7 @@ import { colors, space } from '../theme';
 import type { Block } from '../types';
 
 export function RoutinesScreen() {
+  useCodeRoutineUpdates();
   const t = useT();
   const { routines } = useApp();
   const nav = useNav();
