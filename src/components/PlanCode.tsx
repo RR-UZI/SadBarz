@@ -121,7 +121,7 @@ export function RedeemCard() {
         <Field
           value={code}
           onChangeText={(v) => setCode(v.toUpperCase())}
-          placeholder="SB-7K4QXM"
+          placeholder="SB-XXXXXX"
           inputProps={{ autoCapitalize: 'characters', autoCorrect: false, onSubmitEditing: () => code.trim() && !busy && redeem() }}
         />
       </View>

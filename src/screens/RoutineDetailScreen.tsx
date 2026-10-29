@@ -60,7 +60,7 @@ export function RoutineDetailScreen({ id }: { id: string }) {
           {routine.blocks.length} {t('routines.blocks')}
           {timed > 0 ? ` · ~${clock(timed)}` : ''}
         </Txt>
-        {routine.example ? <Badge label={t('common.example')} /> : routine.fromCode ? <Badge label={routine.fromCode} /> : null}
+        {routine.example ? <Badge label={t('common.example')} /> : null}
       </Row>
       {routine.note ? (
         <Txt color={colors.muted} style={{ marginTop: space.sm }}>
