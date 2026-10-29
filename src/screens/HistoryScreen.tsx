@@ -167,20 +167,28 @@ function WorkoutBlocksSheet({ workout: w, visible, onClose }: { workout: Workout
   const { exerciseById } = useApp();
   const insets = useSafeAreaInsets();
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose} transparent>
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+    <Modal visible={visible} animationType="fade" onRequestClose={onClose} transparent>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: 'rgba(0,0,0,0.7)',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: space.lg,
+          paddingTop: space.lg + insets.top,
+          paddingBottom: space.lg + insets.bottom,
+        }}
+      >
         <View
           style={{
             backgroundColor: colors.bg,
-            borderTopLeftRadius: radius.lg,
-            borderTopRightRadius: radius.lg,
-            maxHeight: '88%',
-            paddingBottom: insets.bottom,
+            borderRadius: radius.lg,
+            maxHeight: '100%',
             width: '100%',
-            maxWidth: 640,
-            alignSelf: 'center',
+            maxWidth: 520,
             borderWidth: 1,
             borderColor: colors.border,
+            overflow: 'hidden',
           }}
         >
           <Row style={{ justifyContent: 'space-between', padding: space.lg }}>
@@ -189,7 +197,7 @@ function WorkoutBlocksSheet({ workout: w, visible, onClose }: { workout: Workout
             </Txt>
             <Button label={t('history.close')} size="sm" variant="ghost" onPress={onClose} />
           </Row>
-          <ScrollView contentContainerStyle={{ gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.lg }}>
+          <ScrollView style={{ flexShrink: 1 }} contentContainerStyle={{ gap: space.md, paddingHorizontal: space.lg, paddingBottom: space.lg }}>
             {w.blocks.map((b, i) => (
               <Card key={i} style={b.status === 'skipped' ? { opacity: 0.6 } : undefined}>
                 <Row style={{ justifyContent: 'space-between' }}>
