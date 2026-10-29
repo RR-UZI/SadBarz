@@ -328,7 +328,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
         </Row>
         <View style={{ gap: space.sm, marginTop: space.xl }}>
           {blocks.map((b, i) => (
-            <BlockStatusRow key={b.id} index={i} block={b} status={statusOf(b)} />
+            <BlockStatusRow key={b.id} index={i} title={b.title || b.format.toUpperCase()} status={statusOf(b)} />
           ))}
         </View>
       </Screen>
@@ -376,7 +376,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
           <BlockStatusRow
             key={b.id}
             index={i}
-            block={b}
+            title={b.title || b.format.toUpperCase()}
             status={statusOf(b)}
             current={i === index}
             // Tap a block to start from it instead.
@@ -391,7 +391,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
   );
 }
 
-function Stat({ label, value }: { label: string; value: string }) {
+export function Stat({ label, value }: { label: string; value: string }) {
   return (
     <View style={{ alignItems: 'center' }}>
       <Txt variant="title" color={colors.accent}>
@@ -404,14 +404,14 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function BlockStatusRow({
-  block,
+export function BlockStatusRow({
+  title,
   index,
   status,
   current,
   onPress,
 }: {
-  block: Block;
+  title: string;
   index: number;
   status: 'done' | 'skipped' | 'todo';
   current?: boolean;
@@ -432,7 +432,7 @@ function BlockStatusRow({
       }}
     >
       <Txt numberOfLines={1} style={{ flex: 1 }}>
-        {index + 1}. {block.title || block.format.toUpperCase()}
+        {index + 1}. {title}
       </Txt>
       <Badge label={t(`run.status.${status}`)} color={color} textColor={textColor} />
     </Row>
