@@ -344,6 +344,21 @@ export interface Redeemed {
 
 export type RedeemResult = { ok: true; plan: Redeemed } | { ok: false; error: RedeemError; next?: string };
 
+/** The current version of plans behind codes this account redeemed (null when it can't ask). */
+export async function redeemedPlans(codes: string[]): Promise<{ code: string; version: string; days: { day: number; routine: Routine }[]; exercises: Exercise[] }[] | null> {
+  if (!supabase || !codes.length) return null;
+  const { data, error } = await supabase.rpc('redeemed_plans', { plan_codes: codes });
+  if (error || !Array.isArray(data)) return null;
+  return (data as { code: string; version: string; days: unknown; exercises: unknown }[])
+    .filter((p) => p.code && p.version && Array.isArray(p.days))
+    .map((p) => ({
+      code: p.code,
+      version: p.version,
+      days: [...(p.days as { day: number; routine: Routine }[])].sort((a, b) => a.day - b.day),
+      exercises: Array.isArray(p.exercises) ? (p.exercises as Exercise[]) : [],
+    }));
+}
+
 export async function redeemCode(code: string): Promise<RedeemResult> {
   if (!supabase) return { ok: false, error: 'offline' };
   const { data, error } = await supabase.rpc('redeem_plan_code', { plan_code: code });

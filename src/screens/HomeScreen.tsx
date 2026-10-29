@@ -3,6 +3,7 @@ import { Image, Pressable, Text, View } from 'react-native';
 
 import { Avatar } from '../components/Avatar';
 import { CoachCard } from '../components/CoachCard';
+import { useCodeRoutineUpdates } from '../components/PlanCode';
 import { Badge, Button, Card, Row, Screen, Section, Txt } from '../components/ui';
 import { WEEK_ROUTINE_IDS } from '../data/seed';
 import { useT } from '../i18n';
@@ -19,6 +20,7 @@ import { MyPlanHomeCard } from './MyPlanScreen';
 import { WorkoutCard } from './HistoryScreen';
 
 export function HomeScreen() {
+  useCodeRoutineUpdates();
   const t = useT();
   const { routines, workouts, avatar } = useApp();
   const { user, setPlanView } = useAuth();

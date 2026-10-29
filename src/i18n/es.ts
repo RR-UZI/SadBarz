@@ -704,7 +704,7 @@ export const es = {
   'review.saveFix': 'Guardar cambios',
   'review.saving': 'Guardando…',
   'review.discard': 'Descartar',
-  'review.fixNote': 'El atleta verá la versión nueva la próxima vez que abra la app. Quienes ya canjearon el código se quedan con la versión anterior.',
+  'review.fixNote': 'El atleta y quienes canjearon el código verán la versión nueva la próxima vez que abran la app.',
   'review.failedNote': 'Este plan falló: {e}',
   'review.saveError': 'No se pudo guardar. Intenta otra vez.',
 };

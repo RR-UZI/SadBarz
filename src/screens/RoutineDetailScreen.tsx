@@ -38,6 +38,8 @@ export function RoutineDetailScreen({ id }: { id: string }) {
       name: `${routine.name} (${t('common.copy')})`,
       example: false,
       fromCode: undefined, // a copy is the athlete's own routine, so it counts toward the limit
+      codeDay: undefined,
+      codeVersion: undefined,
       blocks: routine.blocks.map(cloneBlock),
       createdAt: now,
       updatedAt: now,

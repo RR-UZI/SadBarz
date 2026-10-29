@@ -67,6 +67,9 @@ export interface Routine {
   example?: boolean;
   /** Added by redeeming a plan code (that code). Like the examples, it doesn't count toward the free limit. */
   fromCode?: string;
+  /** For a routine from a code: the plan day it copies, and the plan version it has (so a fixed plan updates it). */
+  codeDay?: number;
+  codeVersion?: string;
   createdAt: number;
   updatedAt: number;
 }
