@@ -1,12 +1,17 @@
-// A vertical list whose rows can be dragged by a handle to change their order.
+// A vertical list whose rows can be dragged to change their order.
+// On web: press and hold a row, then drag it (a quick swipe still scrolls the page). On native: drag the handle.
 import React, { useRef, useState } from 'react';
-import { Animated, PanResponder, type PanResponderInstance, View } from 'react-native';
+import { Animated, PanResponder, type PanResponderInstance, Platform, View } from 'react-native';
 
 import { useT } from '../i18n';
 import { colors } from '../theme';
 import { Txt } from './ui';
 
 type Drag = { from: number; to: number };
+
+const WEB = Platform.OS === 'web';
+const HOLD_MS = 300; // how long to press before the row lifts
+const SLOP = 8; // moving more than this before then means the finger is scrolling
 
 export function DragList<T>({
   items,
@@ -18,7 +23,7 @@ export function DragList<T>({
   items: T[];
   keyOf: (item: T) => string;
   onMove: (from: number, to: number) => void;
-  // `handle` is the grip to place somewhere in the row.
+  // `handle` is the grip to place somewhere in the row (null on web, where the whole row is the grip).
   renderItem: (item: T, index: number, handle: React.ReactNode) => React.ReactNode;
   gap?: number;
 }) {
@@ -94,6 +99,101 @@ export function DragList<T>({
     return r;
   };
 
+  // Web: hold anywhere on the row (except a text field) to lift it, then drag.
+  const cleanups = useRef<Record<string, () => void>>({});
+  // One ref callback per row, kept across renders, so the listeners aren't removed mid-drag.
+  const refs = useRef<Record<string, (node: unknown) => void>>({});
+  const holdable = (key: string) => (refs.current[key] ??= (node: unknown) => {
+    cleanups.current[key]?.();
+    delete cleanups.current[key];
+    const el = node as HTMLElement | null;
+    if (!el || typeof el.addEventListener !== 'function') return;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let startX = 0;
+    let startY = 0;
+    let active = false;
+    const noScroll = (e: TouchEvent) => e.preventDefault();
+    const noClick = (e: MouseEvent) => {
+      e.stopPropagation();
+      e.preventDefault();
+    };
+    const stop = () => {
+      clearTimeout(timer);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      document.removeEventListener('touchmove', noScroll);
+    };
+    const lift = () => {
+      const from = live.current.keys.indexOf(key);
+      if (from < 0) return stop();
+      active = true;
+      document.addEventListener('touchmove', noScroll, { passive: false });
+      window.getSelection?.()?.removeAllRanges();
+      (navigator as { vibrate?: (ms: number) => void }).vibrate?.(10);
+      dy.setValue(0);
+      update({ from, to: from });
+    };
+    const onMove = (e: PointerEvent) => {
+      if (!active) {
+        if (Math.abs(e.clientX - startX) > SLOP || Math.abs(e.clientY - startY) > SLOP) stop();
+        return;
+      }
+      e.preventDefault();
+      const d = live.current.drag;
+      if (!d) return;
+      const offset = e.clientY - startY;
+      dy.setValue(offset);
+      const to = target(d.from, offset);
+      if (to !== d.to) update({ ...d, to });
+    };
+    const onUp = () => {
+      stop();
+      if (!active) return;
+      active = false;
+      // the release would also count as a tap on whatever button is under the finger
+      window.addEventListener('click', noClick, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener('click', noClick, { capture: true }), 50);
+      finish();
+    };
+    const onCancel = () => {
+      stop();
+      if (active) {
+        active = false;
+        finish();
+      }
+    };
+    const onDown = (e: PointerEvent) => {
+      // In nested lists (sets rows and their exercises) the innermost row takes the press.
+      const ev = e as PointerEvent & { dragClaimed?: boolean };
+      if (e.button !== 0 || live.current.drag || ev.dragClaimed) return;
+      ev.dragClaimed = true;
+      const hit = e.target as HTMLElement | null;
+      if (hit?.closest?.('input, textarea, select, [contenteditable="true"]')) return;
+      startX = e.clientX;
+      startY = e.clientY;
+      active = false;
+      stop();
+      timer = setTimeout(lift, HOLD_MS);
+      window.addEventListener('pointermove', onMove, { passive: false });
+      window.addEventListener('pointerup', onUp);
+      window.addEventListener('pointercancel', onCancel);
+    };
+    // a long press would otherwise open the phone's text selection or menu
+    const noMenu = (e: Event) => {
+      if (timer !== undefined || active) e.preventDefault();
+    };
+    el.addEventListener('pointerdown', onDown);
+    el.addEventListener('contextmenu', noMenu);
+    el.addEventListener('selectstart', noMenu);
+    cleanups.current[key] = () => {
+      stop();
+      el.removeEventListener('pointerdown', onDown);
+      el.removeEventListener('contextmenu', noMenu);
+      el.removeEventListener('selectstart', noMenu);
+    };
+  });
+
   // How far the other rows step aside to make room.
   const shift = (j: number) => {
     if (!drag || j === drag.from) return 0;
@@ -108,7 +208,7 @@ export function DragList<T>({
       {items.map((item, i) => {
         const key = keyOf(item);
         const dragging = drag?.from === i;
-        const handle = (
+        const handle = WEB ? null : (
           <View
             {...responderFor(key).panHandlers}
             accessibilityLabel={t('block.drag')}
@@ -128,12 +228,13 @@ export function DragList<T>({
               heights.current[key] = e.nativeEvent.layout.height;
             }}
             style={{
-              transform: [{ translateY: dragging ? dy : shift(i) }],
+              transform: [{ translateY: dragging ? dy : shift(i) }, { scale: dragging ? 1.02 : 1 }],
+              ...(WEB ? ({ cursor: dragging ? 'grabbing' : undefined, WebkitTouchCallout: 'none' } as object) : null),
               zIndex: dragging ? 10 : 0,
                             ...(dragging ? { shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 12, shadowOffset: { width: 0, height: 6 }, elevation: 8 } : null),
             }}
           >
-            {renderItem(item, i, handle)}
+            <View ref={WEB ? (holdable(key) as never) : undefined}>{renderItem(item, i, handle)}</View>
           </Animated.View>
         );
       })}

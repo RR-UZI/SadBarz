@@ -19,7 +19,7 @@ const CAPS = [5, 8, 10, 12, 15, 20, 30]; // AMRAP time caps, minutes
 export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: Block) => void }) {
   const t = useT();
   // Where a picked exercise goes: the block's item list, or a row of sets.
-  const [pickFor, setPickFor] = useState<null | { kind: 'items' } | { kind: 'row'; rowId: string }>(null);
+  const [pickFor, setPickFor] = useState<null | { kind: 'items' } | { kind: 'row'; rowId: string } | { kind: 'swap'; itemId: string }>(null);
   const { exerciseById } = useApp();
 
   const set = (patch: Partial<Block>) => onChange({ ...block, ...patch });
@@ -46,6 +46,12 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
   };
 
   const onPick = (ex: Exercise) => {
+    if (pickFor?.kind === 'swap') {
+      const swap = (list: BlockItem[]) => list.map((x) => (x.id === pickFor.itemId ? swapExercise(x, ex, exerciseById(x.exerciseId)?.kind) : x));
+      set(block.format === 'sets' ? { rows: block.rows.map((r) => ({ ...r, items: swap(r.items) })) } : { items: swap(block.items) });
+      setPickFor(null);
+      return;
+    }
     const item = newItem(ex.id, ex.kind);
     if (pickFor?.kind === 'items') set({ items: [...block.items, item] });
     if (pickFor?.kind === 'row') set({ rows: block.rows.map((r) => (r.id === pickFor.rowId ? { ...r, items: [...r.items, item] } : r)) });
@@ -164,6 +170,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
                 prefix={rotating ? `${t('common.round')} ${turns[i] + 1}` : undefined}
                 sameRound={rotating && i > 0 ? turns[i] === turns[i - 1] : undefined}
                 onSameRound={(on) => set({ items: setSameRound(block, i, on) })}
+                onSwap={() => setPickFor({ kind: 'swap', itemId: it.id })}
                 exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
                 kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
                 onChange={(n) => set({ items: updateItem(block.items, n) })}
@@ -171,6 +178,11 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
               />
             )}
           />
+          {block.items.length > 0 ? (
+            <Txt variant="tiny" color={colors.faint}>
+              {t('block.holdToMove')}
+            </Txt>
+          ) : null}
           <Button label={`+ ${t('block.addExercise')}`} variant="ghost" size="sm" onPress={() => setPickFor({ kind: 'items' })} />
         </View>
       ) : (
@@ -207,6 +219,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
                       exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
                       kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
                       onChange={(n) => updateRow({ ...row, items: updateItem(row.items, n) })}
+                      onSwap={() => setPickFor({ kind: 'swap', itemId: it.id })}
                       onRemove={() => updateRow({ ...row, items: removeItem(row.items, it.id) })}
                     />
                   )}
@@ -216,7 +229,7 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
             )}
           />
           <Txt variant="tiny" color={colors.faint}>
-            {t('block.pairHint')}
+            {t('block.pairHint')} {t('block.holdToMove')}
           </Txt>
           <Button label={`+ ${t('block.addRow')}`} variant="secondary" size="sm" onPress={() => set({ rows: [...block.rows, newRow()] })} />
         </View>
@@ -253,6 +266,7 @@ function ItemEditor({
   prefix,
   sameRound,
   onSameRound,
+  onSwap,
   handle,
   onChange,
   onRemove,
@@ -263,6 +277,7 @@ function ItemEditor({
   prefix?: string;
   sameRound?: boolean; // undefined: not offered
   onSameRound?: (on: boolean) => void;
+  onSwap: () => void;
   handle?: React.ReactNode;
   onChange: (i: BlockItem) => void;
   onRemove: () => void;
@@ -279,7 +294,12 @@ function ItemEditor({
               {prefix}
             </Txt>
           ) : null}
-          <Txt style={{ fontWeight: '700' }}>{exerciseName}</Txt>
+          {/* Tap the name to change the exercise; reps, weight and note stay. */}
+          <Pressable onPress={onSwap} accessibilityRole="button" accessibilityLabel={t('block.swap')} hitSlop={6} style={{ alignSelf: 'flex-start' }}>
+            <Txt style={{ fontWeight: '700' }}>
+              {exerciseName} <Txt color={colors.muted} style={{ fontWeight: '400' }}>⇄</Txt>
+            </Txt>
+          </Pressable>
         </View>
         <Pressable onPress={onRemove} hitSlop={10} accessibilityLabel={t('block.remove')}>
           <Txt color={colors.muted} style={{ fontSize: 20 }}>
@@ -308,4 +328,11 @@ function ItemEditor({
       {showNote ? <Field value={item.note ?? ''} onChangeText={(v) => onChange({ ...item, note: v || undefined })} placeholder={t('block.notePlaceholder')} /> : null}
     </View>
   );
+}
+
+// Same targets when the new exercise is measured the same way; otherwise the new kind's defaults. Weight, note and round stay.
+function swapExercise(item: BlockItem, ex: Exercise, oldKind?: Exercise['kind']): BlockItem {
+  if (oldKind === ex.kind) return { ...item, exerciseId: ex.id };
+  const fresh = newItem(ex.id, ex.kind);
+  return { ...item, exerciseId: ex.id, reps: fresh.reps, seconds: fresh.seconds, meters: fresh.meters, calories: fresh.calories, max: undefined };
 }

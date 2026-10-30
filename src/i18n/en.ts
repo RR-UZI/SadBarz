@@ -96,6 +96,8 @@ export const en: Record<StringKey, string> = {
   'block.max': 'Max',
   'block.notePlaceholder': 'Note: dead stop, unbroken, explosive…',
   'block.drag': 'Drag to move',
+  'block.holdToMove': 'Press and hold a card to move it. Tap an exercise name to change it.',
+  'block.swap': 'Change exercise',
   'block.remove': 'Remove',
   'block.addNote': '+ note',
   'block.sameRound': '↑ Same round',

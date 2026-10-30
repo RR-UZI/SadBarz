@@ -95,6 +95,8 @@ export const es = {
   'block.max': 'Máximo',
   'block.notePlaceholder': 'Nota: DS, unbroken, explosivas…',
   'block.drag': 'Arrastra para mover',
+  'block.holdToMove': 'Mantén presionada una tarjeta para moverla. Toca el nombre de un ejercicio para cambiarlo.',
+  'block.swap': 'Cambiar ejercicio',
   'block.remove': 'Quitar',
   'block.addNote': '+ nota',
   'block.sameRound': '↑ Misma ronda',
