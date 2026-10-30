@@ -43,7 +43,7 @@ function byId<T extends { id: string }>(a: T[], b: T[], pick: (x: T, y: T) => T)
   return [...onlyB, ...a.map((x) => (inB.has(x.id) ? pick(x, inB.get(x.id)!) : x))];
 }
 
-// Combines two copies: everything from both, the newest version of each routine,
+// Combines two copies: everything from both, the newest version of each routine and renamed exercise,
 // newest settings and photo, and anything deleted on either side stays deleted.
 export function mergeSynced(local: Synced, remote: Partial<Synced>): Synced {
   const deleted = { ...(remote.deleted ?? {}) };
@@ -60,7 +60,7 @@ export function mergeSynced(local: Synced, remote: Partial<Synced>): Synced {
   const workouts = byId(local.workouts, remote.workouts ?? [], (x) => x)
     .filter((w) => !(w.id in deleted))
     .sort((x, y) => y.startedAt - x.startedAt);
-  const exercises = byId(local.exercises, remote.exercises ?? [], (x) => x).filter((e) => !(e.id in deleted));
+  const exercises = byId(local.exercises, remote.exercises ?? [], (x, y) => ((y.updatedAt ?? 0) > (x.updatedAt ?? 0) ? y : x)).filter((e) => !(e.id in deleted));
   const records = byId(local.records, remote.records ?? [], (x, y) => (y.updatedAt > x.updatedAt ? y : x)).filter((r) => !(r.id in deleted));
 
   // On a tie the cloud wins, so two devices never keep overwriting each other.

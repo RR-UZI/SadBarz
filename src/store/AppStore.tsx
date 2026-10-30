@@ -62,6 +62,7 @@ interface AppContextValue extends Data {
   saveWorkout: (w: Workout) => void;
   deleteWorkout: (id: string) => void;
   addExercise: (e: Exercise) => void;
+  updateExercise: (e: Exercise) => void;
   updateSettings: (patch: Partial<Settings>) => void;
   setAvatar: (dataUrl: string | null) => void;
   saveRecord: (r: PersonalRecord) => void;
@@ -281,6 +282,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setData((d) => (d.exercises.some((x) => x.id === e.id) ? d : { ...d, exercises: [...d.exercises, { ...e, custom: true }] }));
   }, []);
 
+  const updateExercise = useCallback((e: Exercise) => {
+    setData((d) => ({ ...d, exercises: d.exercises.map((x) => (x.id === e.id ? { ...e, updatedAt: Date.now() } : x)) }));
+  }, []);
+
   const updateSettings = useCallback((patch: Partial<Settings>) => {
     setData((d) => ({ ...d, settings: { ...d.settings, ...patch }, settingsAt: Date.now() }));
   }, []);
@@ -312,8 +317,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AppContextValue>(
-    () => ({ ...data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples }),
-    [data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples],
+    () => ({ ...data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples }),
+    [data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -10,6 +10,7 @@ export interface Exercise {
   kind: ExerciseKind;
   category: Category;
   custom?: boolean;
+  updatedAt?: number; // set when renamed, so the newest name wins in sync
 }
 
 // One move inside a block, with its target.
