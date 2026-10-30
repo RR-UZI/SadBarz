@@ -14,10 +14,13 @@ const CATEGORIES: Category[] = ['push', 'pull', 'tubos', 'legs', 'core', 'skills
 export function ExercisePicker({ visible, onClose, onPick }: { visible: boolean; onClose: () => void; onPick: (e: Exercise) => void }) {
   const t = useT();
   const insets = useSafeAreaInsets();
-  const { exercises, addExercise } = useApp();
+  const { exercises, addExercise, updateExercise } = useApp();
   const [query, setQuery] = useState('');
   const [cat, setCat] = useState<Category | null>(null);
   const [creating, setCreating] = useState(false);
+  // An exercise the user made, open for fixing its name or group (its kind stays: routines already use it).
+  const [editing, setEditing] = useState<Exercise | null>(null);
+  const inForm = creating || editing !== null;
   const [newName, setNewName] = useState('');
   const [newKind, setNewKind] = useState<ExerciseKind>('reps');
   const [newCat, setNewCat] = useState<Category>('push');
@@ -27,8 +30,24 @@ export function ExercisePicker({ visible, onClose, onPick }: { visible: boolean;
     return exercises.filter((e) => (!cat || e.category === cat) && (!q || e.name.toLowerCase().includes(q)));
   }, [exercises, query, cat]);
 
+  const startEdit = (ex: Exercise) => {
+    setEditing(ex);
+    setNewName(ex.name);
+    setNewCat(ex.category);
+  };
+
+  const closeForm = () => {
+    setCreating(false);
+    setEditing(null);
+    setNewName('');
+  };
+
   const create = () => {
     if (!newName.trim()) return;
+    if (editing) {
+      updateExercise({ ...editing, name: newName.trim(), category: newCat });
+      return closeForm();
+    }
     const ex: Exercise = { id: uid('ex'), name: newName.trim(), kind: newKind, category: newCat, custom: true };
     addExercise(ex);
     setCreating(false);
@@ -55,24 +74,26 @@ export function ExercisePicker({ visible, onClose, onPick }: { visible: boolean;
           }}
         >
           <Row style={{ justifyContent: 'space-between', padding: space.lg }}>
-            <Txt variant="h2">{creating ? t('exercise.new') : t('exercise.pick')}</Txt>
-            <Button label={t('common.cancel')} size="sm" variant="ghost" onPress={() => (creating ? setCreating(false) : onClose())} />
+            <Txt variant="h2">{editing ? t('exercise.edit') : creating ? t('exercise.new') : t('exercise.pick')}</Txt>
+            <Button label={t('common.cancel')} size="sm" variant="ghost" onPress={() => (inForm ? closeForm() : onClose())} />
           </Row>
 
-          {creating ? (
+          {inForm ? (
             <View style={{ paddingHorizontal: space.lg, gap: space.lg }}>
               <Field label={t('exercise.name')} value={newName} onChangeText={setNewName} placeholder="Ej. Tubo con lastre" />
-              <View style={{ gap: 6 }}>
-                <Txt variant="small" color={colors.muted}>
-                  {t('exercise.kind')}
-                </Txt>
-                <Segmented
-                  small
-                  value={newKind}
-                  onChange={setNewKind}
-                  options={(['reps', 'hold', 'distance', 'calories'] as ExerciseKind[]).map((k) => ({ value: k, label: t(`exercise.kind.${k}`) }))}
-                />
-              </View>
+              {editing ? null : (
+                <View style={{ gap: 6 }}>
+                  <Txt variant="small" color={colors.muted}>
+                    {t('exercise.kind')}
+                  </Txt>
+                  <Segmented
+                    small
+                    value={newKind}
+                    onChange={setNewKind}
+                    options={(['reps', 'hold', 'distance', 'calories'] as ExerciseKind[]).map((k) => ({ value: k, label: t(`exercise.kind.${k}`) }))}
+                  />
+                </View>
+              )}
               <View style={{ gap: 6 }}>
                 <Txt variant="small" color={colors.muted}>
                   {t('exercise.category')}
@@ -83,6 +104,11 @@ export function ExercisePicker({ visible, onClose, onPick }: { visible: boolean;
                   ))}
                 </Row>
               </View>
+              {editing ? (
+                <Txt variant="tiny" color={colors.faint}>
+                  {t('exercise.editHint')}
+                </Txt>
+              ) : null}
               <Button label={t('common.save')} onPress={create} disabled={!newName.trim()} />
             </View>
           ) : (
@@ -106,14 +132,23 @@ export function ExercisePicker({ visible, onClose, onPick }: { visible: boolean;
                   <Pressable
                     onPress={() => onPick(item)}
                     style={({ pressed }) => [
-                      { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between' },
+                      { paddingVertical: 13, borderBottomWidth: 1, borderBottomColor: colors.border, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.md },
                       pressed && { opacity: 0.6 },
                     ]}
                   >
-                    <Txt>{item.name}</Txt>
-                    <Txt variant="small" color={colors.muted}>
-                      {t(`cat.${item.category}`)}
-                    </Txt>
+                    <Txt style={{ flex: 1 }}>{item.name}</Txt>
+                    <Row gap={space.md}>
+                      <Txt variant="small" color={colors.muted}>
+                        {t(`cat.${item.category}`)}
+                      </Txt>
+                      {item.custom ? (
+                        <Pressable onPress={() => startEdit(item)} hitSlop={10} accessibilityRole="button" accessibilityLabel={`${t('exercise.rename')}: ${item.name}`}>
+                          <Txt variant="small" color={colors.accent}>
+                            ✎
+                          </Txt>
+                        </Pressable>
+                      ) : null}
+                    </Row>
                   </Pressable>
                 )}
               />
