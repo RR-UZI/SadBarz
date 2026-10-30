@@ -98,6 +98,26 @@ function turnCount(b: Block) {
   return new Set(itemTurns(b)).size;
 }
 
+// Alternating blocks: put item i in the same round as the item above it (on), or give it its own round (off).
+// The item's whole group moves with it. Turns come back numbered 1, 2, 3... in the order they appear.
+export function setSameRound(b: Block, i: number, on: boolean): BlockItem[] {
+  const turns = itemTurns(b);
+  const next = [...turns];
+  if (on && i > 0) {
+    const from = turns[i];
+    for (let j = 0; j < next.length; j++) if (turns[j] === from) next[j] = turns[i - 1];
+  } else if (!on) {
+    // this item and the ones right below it in the same round start a new round
+    const fresh = Math.max(...turns) + 1;
+    for (let j = i; j < next.length && turns[j] === turns[i]; j++) next[j] = fresh;
+  }
+  const order: number[] = [];
+  next.forEach((n) => {
+    if (!order.includes(n)) order.push(n);
+  });
+  return b.items.map((it, j) => ({ ...it, turn: order.indexOf(next[j]) + 1 }));
+}
+
 // Which items are done in a given round (1-based) of an emom/tabata block.
 export function itemsForRound(b: Block, round: number): BlockItem[] {
   if (b.items.length === 0) return [];

@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { blockDurationSec, DEFAULT_AMRAP_SEC, DEFAULT_FORTIME_SEC, itemTurns, newItem, newRow } from '../lib/blocks';
+import { blockDurationSec, DEFAULT_AMRAP_SEC, DEFAULT_FORTIME_SEC, itemTurns, newItem, newRow, setSameRound } from '../lib/blocks';
 import { clock, shortDuration } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
@@ -23,6 +23,9 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
   const { exerciseById } = useApp();
 
   const set = (patch: Partial<Block>) => onChange({ ...block, ...patch });
+  // Alternating emom/tabata: each item shows its round, and can share the round of the item above it.
+  const rotating = block.perRound === 'rotate' && (block.format === 'emom' || block.format === 'tabata');
+  const turns = itemTurns(block);
 
   const setFormat = (format: BlockFormat) => {
     const patch: Partial<Block> = { format };
@@ -158,7 +161,9 @@ export function BlockEditor({ block, onChange }: { block: Block; onChange: (b: B
               <ItemEditor
                 item={it}
                 handle={block.items.length > 1 ? handle : undefined}
-                prefix={block.perRound === 'rotate' && block.format !== 'circuit' ? `${t('common.round')} ${itemTurns(block)[i] + 1}` : undefined}
+                prefix={rotating ? `${t('common.round')} ${turns[i] + 1}` : undefined}
+                sameRound={rotating && i > 0 ? turns[i] === turns[i - 1] : undefined}
+                onSameRound={(on) => set({ items: setSameRound(block, i, on) })}
                 exerciseName={exerciseById(it.exerciseId)?.name ?? '?'}
                 kind={exerciseById(it.exerciseId)?.kind ?? 'reps'}
                 onChange={(n) => set({ items: updateItem(block.items, n) })}
@@ -246,6 +251,8 @@ function ItemEditor({
   exerciseName,
   kind,
   prefix,
+  sameRound,
+  onSameRound,
   handle,
   onChange,
   onRemove,
@@ -254,6 +261,8 @@ function ItemEditor({
   exerciseName: string;
   kind: Exercise['kind'];
   prefix?: string;
+  sameRound?: boolean; // undefined: not offered
+  onSameRound?: (on: boolean) => void;
   handle?: React.ReactNode;
   onChange: (i: BlockItem) => void;
   onRemove: () => void;
@@ -293,6 +302,7 @@ function ItemEditor({
         ) : null}
         <NumberField label={t('block.weight')} value={item.weightKg} width={48} step={5} onChange={(v) => onChange({ ...item, weightKg: v || undefined })} allowEmpty />
         {kind === 'reps' ? <Chip label={t('block.max')} active={!!item.max} onPress={() => onChange({ ...item, max: !item.max })} /> : null}
+        {sameRound != null && onSameRound ? <Chip label={t('block.sameRound')} active={sameRound} onPress={() => onSameRound(!sameRound)} /> : null}
         {!showNote ? <Chip label={t('block.addNote')} onPress={() => setShowNote(true)} /> : null}
       </Row>
       {showNote ? <Field value={item.note ?? ''} onChangeText={(v) => onChange({ ...item, note: v || undefined })} placeholder={t('block.notePlaceholder')} /> : null}
