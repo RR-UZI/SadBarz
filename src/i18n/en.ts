@@ -98,6 +98,7 @@ export const en: Record<StringKey, string> = {
   'block.drag': 'Drag to move',
   'block.remove': 'Remove',
   'block.addNote': '+ note',
+  'block.sameRound': '↑ Same round',
   'block.noExercises': 'No exercises yet.',
 
   'exercise.pick': 'Pick an exercise',

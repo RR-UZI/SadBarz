@@ -97,6 +97,7 @@ export const es = {
   'block.drag': 'Arrastra para mover',
   'block.remove': 'Quitar',
   'block.addNote': '+ nota',
+  'block.sameRound': '↑ Misma ronda',
   'block.noExercises': 'Sin ejercicios todavía.',
 
   'exercise.pick': 'Elegir ejercicio',
