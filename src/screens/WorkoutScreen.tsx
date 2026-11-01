@@ -1,16 +1,18 @@
 // Workout mode: runs a routine block by block.
 // ready -> running -> review (Done / Repeat / Skip / Finish) -> break -> ready ... -> summary
 // Progress is saved on the device as it goes: leaving with the back button keeps it, and Home offers to continue.
+// Any block can be edited mid-workout (✎): the running one pauses while it's edited and carries on from the same point.
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { BlockEditor } from '../components/BlockEditor';
 import { BlockRunner } from '../components/BlockRunner';
 import { LogoMark } from '../components/Logo';
-import { Badge, Button, Card, NumberField, Row, Screen, Txt } from '../components/ui';
+import { Badge, Button, Card, NumberField, Row, Screen, ToggleRow, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { type ActiveWorkout, clearActiveWorkout, type RunState, saveActiveWorkout, type SavedPhase } from '../lib/activeWorkout';
-import { defaultEntries, forTimeText, totalReps } from '../lib/blocks';
+import { defaultEntries, flattenSets, forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
 import { sounds, unlockAudio } from '../lib/sound';
 import { useClock } from '../lib/useClock';
@@ -49,12 +51,26 @@ function restorePhase(p: SavedPhase): Phase {
   return p.kind === 'running' ? { kind: 'running', run: RESUMED_RUN } : p;
 }
 
+// The running block's position, made to fit the block after an edit. A block whose format
+// changed can't carry on from where it was, so it starts over (undefined).
+function fitRun(before: Block, after: Block, s: RunState | undefined): RunState | undefined {
+  if (!s || before.format !== after.format) return undefined;
+  if (after.format === 'sets') {
+    const last = Math.max(0, flattenSets(after).length - 1);
+    const i = Number(s.i ?? 0);
+    return i > last ? { ...s, i: last, mode: 'work', ms: 0 } : s;
+  }
+  if (after.format === 'circuit') return { ...s, round: Math.min(Number(s.round ?? 1), after.rounds) };
+  return s;
+}
+
 export function WorkoutScreen({ routineId, routine: given, resume }: { routineId: string; routine?: Routine; resume?: ActiveWorkout }) {
   const t = useT();
   const nav = useNav();
-  const { routines, settings, saveWorkout } = useApp();
+  const { routines, settings, saveWorkout, saveRoutine } = useApp();
   const { user } = useAuth();
-  const routine = resume?.routine ?? given ?? routines.find((r) => r.id === routineId);
+  // This workout's own copy: blocks edited mid-workout change it (and the saved routine only if asked).
+  const [routine, setRoutine] = useState<Routine | undefined>(() => resume?.routine ?? given ?? routines.find((r) => r.id === routineId));
   const blocks = routine?.blocks ?? [];
 
   const [index, setIndex] = useState(resume?.index ?? 0);
@@ -65,6 +81,13 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
   const [forTime, setForTime] = useState<ForTimeScore | undefined>(resume?.forTime);
   const startedAt = useRef(resume?.startedAt ?? Date.now());
   const runCount = useRef(resume?.phase.kind === 'running' ? RESUMED_RUN : 0);
+  // The run that picks up from a saved position (a resumed workout, or after an edit), and that position.
+  const resumeRun = useRef<{ run: number; state: RunState } | null>(
+    resume?.phase.kind === 'running' && resume.run ? { run: RESUMED_RUN, state: resume.run } : null,
+  );
+  // A block being edited mid-workout: the block as it was, and the draft.
+  const [editing, setEditing] = useState<{ before: Block; draft: Block } | null>(null);
+  const [alsoRoutine, setAlsoRoutine] = useState(false);
 
   useKeepAwake(settings.keepAwake);
 
@@ -222,17 +245,75 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
 
   const title = t('run.blockOf', { n: index + 1, total: blocks.length });
 
+  // ---- editing a block mid-workout ----
+  const editBlock = (b: Block) => setEditing({ before: b, draft: b });
+  const editButton = (b: Block) => <Button label={`✎ ${t('common.edit')}`} variant="ghost" size="sm" onPress={() => editBlock(b)} />;
+  // The runner was taken off screen while editing: put it back where it was, paused.
+  const backToRun = (before: Block, after: Block) => {
+    if (phase.kind !== 'running' || before.id !== block.id) return;
+    const s = fitRun(before, after, run.current);
+    if (!s) {
+      setPhase({ kind: 'ready' });
+      return;
+    }
+    runCount.current += 1;
+    resumeRun.current = { run: runCount.current, state: s };
+    run.current = s;
+    setPhase({ kind: 'running', run: runCount.current });
+  };
+  const cancelEdit = () => {
+    if (!editing) return;
+    setEditing(null);
+    backToRun(editing.before, editing.before);
+  };
+  const saveEdit = () => {
+    if (!editing) return;
+    const b = editing.draft;
+    const swap = (r: Routine): Routine => ({ ...r, blocks: r.blocks.map((x) => (x.id === b.id ? b : x)) });
+    setRoutine(swap(routine));
+    const saved = routines.find((r) => r.id === routine.id);
+    if (alsoRoutine && saved) saveRoutine(swap(saved));
+    setEditing(null);
+    backToRun(editing.before, b);
+  };
+  if (editing) {
+    const saved = routines.some((r) => r.id === routine.id && r.blocks.some((x) => x.id === editing.draft.id));
+    const runningThis = phase.kind === 'running' && editing.before.id === block.id;
+    return (
+      <Screen
+        title={t('run.editBlock')}
+        onBack={cancelEdit}
+        footer={
+          <Row>
+            <Button label={t('common.cancel')} variant="ghost" flex onPress={cancelEdit} />
+            <Button label={runningThis ? t('run.saveAndContinue') : t('common.save')} flex onPress={saveEdit} />
+          </Row>
+        }
+      >
+        <Txt variant="small" color={colors.muted} style={{ marginBottom: space.md }}>
+          {runningThis ? t('run.editPaused') : t('run.editHint')}
+        </Txt>
+        <BlockEditor block={editing.draft} onChange={(draft) => setEditing((e) => (e ? { ...e, draft } : e))} />
+        {saved ? (
+          <View style={{ marginTop: space.lg }}>
+            <ToggleRow label={t('run.alsoRoutine')} value={alsoRoutine} onChange={setAlsoRoutine} />
+          </View>
+        ) : null}
+      </Screen>
+    );
+  }
+
   // ---- running ----
   if (phase.kind === 'running') {
     return (
-      <Screen title={block.title || title} onBack={exit}>
+      <Screen title={block.title || title} onBack={exit} right={editButton(block)}>
         <Txt variant="small" color={colors.muted} style={{ textAlign: 'center', marginBottom: space.sm }}>
           {routine.name} · {title}
         </Txt>
         <BlockRunner
           key={phase.run}
           block={block}
-          resume={resume?.phase.kind === 'running' && phase.run === RESUMED_RUN ? resume.run : undefined}
+          resume={resumeRun.current?.run === phase.run ? resumeRun.current.state : undefined}
           report={(s) => {
             run.current = s;
           }}
@@ -338,9 +419,10 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
         </View>
         {next ? (
           <Card style={{ marginTop: space.xl }}>
-            <Txt variant="label" style={{ marginBottom: space.sm }}>
-              {t('run.upNext')}
-            </Txt>
+            <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
+              <Txt variant="label">{t('run.upNext')}</Txt>
+              {editButton(next)}
+            </Row>
             <BlockSummary block={next} />
           </Card>
         ) : null}
@@ -354,9 +436,12 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
       <Screen title={t('run.rest')} onBack={exit}>
         <BreakCountdown seconds={phase.seconds} onDone={breakOver} />
         <Card style={{ marginTop: space.lg }}>
-          <Txt variant="label" style={{ marginBottom: space.sm }}>
-            {t('run.upNext')} · {title}
-          </Txt>
+          <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
+            <Txt variant="label">
+              {t('run.upNext')} · {title}
+            </Txt>
+            {editButton(block)}
+          </Row>
           <BlockSummary block={block} />
         </Card>
       </Screen>
@@ -442,7 +527,10 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
           </Txt>
         </Card>
       ) : null}
-      <Txt variant="label">{title}</Txt>
+      <Row style={{ justifyContent: 'space-between' }}>
+        <Txt variant="label">{title}</Txt>
+        {editButton(block)}
+      </Row>
       <Card style={{ marginTop: space.sm, borderColor: colors.accent }}>
         <BlockSummary block={block} />
       </Card>
