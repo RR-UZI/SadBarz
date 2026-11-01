@@ -82,7 +82,7 @@ function renderRoute(r: Route) {
     case 'editRoutine':
       return <RoutineEditorScreen id={r.id} draft={r.draft} onSave={r.onSave} />;
     case 'workout':
-      return <WorkoutScreen routineId={r.routineId} routine={r.routine} />;
+      return <WorkoutScreen routineId={r.routineId} routine={r.routine} resume={r.resume} />;
     case 'quickTimer':
       return <QuickTimerScreen block={r.block} title={r.title} />;
     case 'stopwatch':

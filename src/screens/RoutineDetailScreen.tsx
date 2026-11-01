@@ -1,6 +1,7 @@
 import React from 'react';
 import { View } from 'react-native';
 
+import { ActiveWorkoutCard } from '../components/ActiveWorkoutCard';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { blockDurationSec, cloneBlock } from '../lib/blocks';
@@ -55,6 +56,7 @@ export function RoutineDetailScreen({ id }: { id: string }) {
       right={<Button label={t('common.edit')} size="sm" variant="secondary" onPress={() => nav.push({ name: 'editRoutine', id: routine.id })} />}
       footer={<Button label={t('routines.startWorkout')} size="lg" onPress={() => nav.push({ name: 'workout', routineId: routine.id })} disabled={routine.blocks.length === 0} />}
     >
+      <ActiveWorkoutCard routineId={routine.id} />
       <Row style={{ justifyContent: 'space-between' }}>
         <Txt variant="small" color={colors.muted}>
           {routine.blocks.length} {t('routines.blocks')}

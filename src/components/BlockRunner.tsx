@@ -9,10 +9,18 @@ import { useClock } from '../lib/useClock';
 import { clock } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
+import type { RunState } from '../lib/activeWorkout';
 import type { AmrapScore, Block, BlockItem, ForTimeScore, Settings } from '../types';
 import { Button, NumberField, Row, Txt } from './ui';
 
-type Props = { block: Block; onFinish: (durationSec: number, score?: AmrapScore, forTime?: ForTimeScore) => void };
+type Props = {
+  block: Block;
+  onFinish: (durationSec: number, score?: AmrapScore, forTime?: ForTimeScore) => void;
+  // A block picked up where it was left: it opens paused at that point, without the start sounds.
+  resume?: RunState;
+  // Called with the runner's position on every render, so the workout can be saved as it goes.
+  report?: (s: RunState) => void;
+};
 
 // The lead-in counts down silently and beeps only on its last seconds (3, 2, 1).
 const LEAD_BEEPS = 3;
@@ -26,6 +34,17 @@ export function BlockRunner(props: Props) {
 }
 
 // ---------- shared pieces ----------
+
+function useReport(report: Props['report'], state: RunState) {
+  useEffect(() => {
+    report?.(state);
+  });
+}
+
+// A value saved with the runner's position, or `fallback` for a fresh start.
+function resumed<T>(resume: RunState | undefined, key: string, fallback: T): T {
+  return resume && key in resume ? (resume[key] as T) : fallback;
+}
 
 function useCues(settings: Settings) {
   const t = useT();
@@ -122,11 +141,11 @@ function StepButtons({ back, forward, onBack, onForward, backDisabled }: { back:
 
 // ---------- EMOM / interval and Tabata ----------
 
-function TimedRunner({ block, onFinish }: Props) {
+function TimedRunner({ block, onFinish, resume, report }: Props) {
   const t = useT();
   const { settings } = useApp();
   const cues = useCues(settings);
-  const c = useClock(100);
+  const c = useClock(100, resume?.ms);
   const segs = useMemo(() => buildTimeline(block, settings.leadInSec), [block, settings.leadInSec]);
   const total = timelineLength(segs);
   const leadIn = settings.leadInSec;
@@ -137,13 +156,15 @@ function TimedRunner({ block, onFinish }: Props) {
   const seg = segs[Math.min(idx, segs.length - 1)];
   const remaining = finished ? 0 : seg.start + seg.duration - tSec;
 
-  const lastIdx = useRef(-1);
+  // resumed: already in this segment, so its "round N" cue isn't played again
+  const lastIdx = useRef(resume ? idx : -1);
   const lastTick = useRef('');
   const done = useRef(false);
+  useReport(report, { ms: c.elapsedMs });
 
   useEffect(() => {
     unlockAudio();
-    c.start();
+    if (!resume) c.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -232,21 +253,23 @@ function TimedRunner({ block, onFinish }: Props) {
 
 // ---------- Sets with rest ----------
 
-function SetsRunner({ block, onFinish }: Props) {
+function SetsRunner({ block, onFinish, resume, report }: Props) {
   const t = useT();
   const { settings } = useApp();
   const cues = useCues(settings);
   const flat = useMemo(() => flattenSets(block), [block]);
-  const [i, setI] = useState(0);
-  const [mode, setMode] = useState<'leadin' | 'work' | 'rest'>(settings.leadInSec > 0 ? 'leadin' : 'work');
-  const [restDur, setRestDur] = useState(0);
-  const phase = useClock(100); // current lead-in / set / rest
-  const total = useClock(500); // whole block
+  const [i, setI] = useState(() => resumed(resume, 'i', 0));
+  const [mode, setMode] = useState<'leadin' | 'work' | 'rest'>(() => resumed(resume, 'mode', settings.leadInSec > 0 ? 'leadin' : 'work'));
+  const [restDur, setRestDur] = useState(() => resumed(resume, 'restDur', 0));
+  const phase = useClock(100, resume?.ms); // current lead-in / set / rest
+  const total = useClock(500, resumed(resume, 'total', 0)); // whole block
   const lastTick = useRef('');
-  const startedCue = useRef(false);
+  const startedCue = useRef(!!resume && mode !== 'leadin');
+  useReport(report, { ms: phase.elapsedMs, total: total.elapsedMs, i, mode, restDur });
 
   useEffect(() => {
     unlockAudio();
+    if (resume) return;
     phase.start();
     total.start();
     if (settings.leadInSec === 0) {
@@ -412,25 +435,26 @@ function SetsRunner({ block, onFinish }: Props) {
 // Seconds counted down before the next round starts, once the athlete says they are ready.
 const NEXT_ROUND_COUNTDOWN = 3;
 
-function CircuitRunner({ block, onFinish }: Props) {
+function CircuitRunner({ block, onFinish, resume, report }: Props) {
   const t = useT();
   const { settings } = useApp();
   const cues = useCues(settings);
-  const c = useClock(100);
-  const [round, setRound] = useState(1);
+  const c = useClock(100, resume?.ms);
+  const [round, setRound] = useState(() => resumed(resume, 'round', 1));
   // Each finished round's own time; the break between rounds is not counted in it.
-  const [roundTimes, setRoundTimes] = useState<number[]>([]);
-  const [roundStart, setRoundStart] = useState(0);
+  const [roundTimes, setRoundTimes] = useState<number[]>(() => resumed(resume, 'roundTimes', []));
+  const [roundStart, setRoundStart] = useState(() => resumed(resume, 'roundStart', 0));
   // 'rest': a round was just finished and we wait for "start next round".
   // 'countdown': 3, 2, 1 before the next round's stopwatch starts.
-  const [phase, setPhase] = useState<'work' | 'rest' | 'countdown'>('work');
-  const [phaseStart, setPhaseStart] = useState(0);
+  const [phase, setPhase] = useState<'work' | 'rest' | 'countdown'>(() => resumed(resume, 'phase', 'work'));
+  const [phaseStart, setPhaseStart] = useState(() => resumed(resume, 'phaseStart', 0));
   const lastTick = useRef('');
-  const started = useRef(false);
+  const started = useRef(!!resume && resume.ms / 1000 >= settings.leadInSec);
+  useReport(report, { ms: c.elapsedMs, round, roundTimes, roundStart, phase, phaseStart });
 
   useEffect(() => {
     unlockAudio();
-    c.start();
+    if (!resume) c.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -580,22 +604,23 @@ function CircuitRunner({ block, onFinish }: Props) {
 // Beeps on the last seconds of the time cap, and the clock turns orange for the final stretch.
 const AMRAP_FINAL_SEC = 10;
 
-function AmrapRunner({ block, onFinish }: Props) {
+function AmrapRunner({ block, onFinish, resume, report }: Props) {
   const t = useT();
   const { settings } = useApp();
   const cues = useCues(settings);
-  const c = useClock(100);
+  const c = useClock(100, resume?.ms);
   const cap = block.capSec ?? DEFAULT_AMRAP_SEC;
   // Time on the clock when each round was finished.
-  const [splits, setSplits] = useState<number[]>([]);
-  const [over, setOver] = useState(false);
-  const [extraReps, setExtraReps] = useState(0);
+  const [splits, setSplits] = useState<number[]>(() => resumed(resume, 'splits', []));
+  const [over, setOver] = useState(() => resumed(resume, 'over', false));
+  const [extraReps, setExtraReps] = useState(() => resumed(resume, 'extraReps', 0));
   const lastTick = useRef('');
-  const started = useRef(false);
+  const started = useRef(!!resume && resume.ms / 1000 >= settings.leadInSec);
+  useReport(report, { ms: c.elapsedMs, splits, over, extraReps });
 
   useEffect(() => {
     unlockAudio();
-    c.start();
+    if (!resume) c.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -707,22 +732,23 @@ function AmrapRunner({ block, onFinish }: Props) {
 
 // The stopwatch counts up until the athlete finishes or the time cap is reached.
 // Finished: the score is the time. Capped: the score is the rounds and reps done.
-function ForTimeRunner({ block, onFinish }: Props) {
+function ForTimeRunner({ block, onFinish, resume, report }: Props) {
   const t = useT();
   const { settings } = useApp();
   const cues = useCues(settings);
-  const c = useClock(100);
+  const c = useClock(100, resume?.ms);
   const cap = block.capSec ?? DEFAULT_FORTIME_SEC;
   // Time on the clock when each round was finished.
-  const [splits, setSplits] = useState<number[]>([]);
-  const [result, setResult] = useState<{ kind: 'done'; timeSec: number } | { kind: 'capped' } | null>(null);
-  const [reps, setReps] = useState(0);
+  const [splits, setSplits] = useState<number[]>(() => resumed(resume, 'splits', []));
+  const [result, setResult] = useState<{ kind: 'done'; timeSec: number } | { kind: 'capped' } | null>(() => resumed(resume, 'result', null));
+  const [reps, setReps] = useState(() => resumed(resume, 'reps', 0));
   const lastTick = useRef('');
-  const started = useRef(false);
+  const started = useRef(!!resume && resume.ms / 1000 >= settings.leadInSec);
+  useReport(report, { ms: c.elapsedMs, splits, result, reps });
 
   useEffect(() => {
     unlockAudio();
-    c.start();
+    if (!resume) c.start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

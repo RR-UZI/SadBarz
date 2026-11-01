@@ -1,6 +1,7 @@
 import React from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
 
+import { ActiveWorkoutCard } from '../components/ActiveWorkoutCard';
 import { Avatar } from '../components/Avatar';
 import { CoachCard } from '../components/CoachCard';
 import { useCodeRoutineUpdates } from '../components/PlanCode';
@@ -70,6 +71,9 @@ export function HomeScreen() {
           {user ? t('home.helloName', { name: user.name.split(' ')[0] }) : t('home.hello')}
         </Txt>
       </View>
+
+      {/* A workout left halfway comes first: it's what they were in the middle of. */}
+      <ActiveWorkoutCard />
 
       {/* The coach's approved plan: today's routine first, it's what they came for. */}
       <MyPlanHomeCard />
