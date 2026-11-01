@@ -20,6 +20,17 @@ One codebase for web, iPhone and Android (Expo / React Native). Spanish first, s
 
 Data is saved on the device (browser storage on web). Accounts, cloud backup, the coach and payments come in later phases.
 
+## Roles
+
+SadBarz has four roles. Each one is a flag in the account's **app_metadata**, which only the server can set, so nobody can give themselves a role.
+
+| Role | Flag | What it gets | Status |
+| :--- | :--- | :--- | :--- |
+| **Athlete Free** | none (the default) | Up to 5 of their own routines, every timer and workout feature, and limited plan codes. | Works |
+| **Athlete Pro** | `"plan": "pro"` | No routine limit, unlimited plan codes, and the AI coach. | Works. Set by hand until Stripe (step 8) |
+| **Coach** | `"coach": true`, and always `"plan": "pro"` | Builds routines and weekly plans, gets a code for each, shares it, and sees how many people redeemed it (see [Later: professional coaches](#later-professional-coaches)). A coach account that isn't Pro gets no coach tools. Uzi approves who becomes a coach. | Planned |
+| **Admin** | `"admin": true` | Uzi. Reviews and approves AI coach plans, sees every code and redemption, has the Free/Pro view switch, and approves coaches. | Works |
+
 ## Run it
 
 ```bash
