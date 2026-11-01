@@ -2,6 +2,7 @@
 // Kept simple on purpose so the web build works from any URL.
 import React, { createContext, useCallback, useContext, useMemo, useState } from 'react';
 
+import type { ActiveWorkout } from './lib/activeWorkout';
 import type { Block, PersonalRecord, Routine } from './types';
 
 export type TabName = 'home' | 'routines' | 'timers' | 'history';
@@ -9,7 +10,7 @@ export type TabName = 'home' | 'routines' | 'timers' | 'history';
 export type Route =
   | { name: 'routine'; id: string }
   | { name: 'editRoutine'; id?: string; draft?: Routine; onSave?: (r: Routine) => void } // draft + onSave: edit a routine that isn't saved in the app (a coach plan)
-  | { name: 'workout'; routineId: string; routine?: Routine } // routine: one that isn't saved in the app (a day of Mi plan)
+  | { name: 'workout'; routineId: string; routine?: Routine; resume?: ActiveWorkout } // routine: one that isn't saved in the app (a day of Mi plan); resume: an unfinished workout
   | { name: 'quickTimer'; block: Block; title: string }
   | { name: 'stopwatch' }
   | { name: 'workoutDetail'; id: string }

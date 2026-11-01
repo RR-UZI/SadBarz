@@ -1,5 +1,6 @@
 // Workout mode: runs a routine block by block.
 // ready -> running -> review (Done / Repeat / Skip / Finish) -> break -> ready ... -> summary
+// Progress is saved on the device as it goes: leaving with the back button keeps it, and Home offers to continue.
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -8,6 +9,7 @@ import { BlockRunner } from '../components/BlockRunner';
 import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, NumberField, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
+import { type ActiveWorkout, clearActiveWorkout, type RunState, saveActiveWorkout, type SavedPhase } from '../lib/activeWorkout';
 import { defaultEntries, forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
 import { sounds, unlockAudio } from '../lib/sound';
@@ -15,6 +17,7 @@ import { useClock } from '../lib/useClock';
 import { clock, uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
+import { useAuth } from '../store/Auth';
 import { colors, radius, space } from '../theme';
 import type { AmrapScore, Block, BlockLog, ForTimeScore, LogEntry, Routine, Workout } from '../types';
 import { BlockSummary } from './RoutinesScreen';
@@ -40,23 +43,82 @@ export function useKeepAwake(enabled: boolean) {
   }, [enabled]);
 }
 
-export function WorkoutScreen({ routineId, routine: given }: { routineId: string; routine?: Routine }) {
+// The saved phase back as a live one: a block that was running comes back as run 1.
+const RESUMED_RUN = 1;
+function restorePhase(p: SavedPhase): Phase {
+  return p.kind === 'running' ? { kind: 'running', run: RESUMED_RUN } : p;
+}
+
+export function WorkoutScreen({ routineId, routine: given, resume }: { routineId: string; routine?: Routine; resume?: ActiveWorkout }) {
   const t = useT();
   const nav = useNav();
   const { routines, settings, saveWorkout } = useApp();
-  const routine = given ?? routines.find((r) => r.id === routineId);
+  const { user } = useAuth();
+  const routine = resume?.routine ?? given ?? routines.find((r) => r.id === routineId);
   const blocks = routine?.blocks ?? [];
 
-  const [index, setIndex] = useState(0);
-  const [phase, setPhase] = useState<Phase>({ kind: 'ready' });
-  const [logs, setLogs] = useState<BlockLog[]>([]);
-  const [entries, setEntries] = useState<LogEntry[]>([]);
-  const [score, setScore] = useState<AmrapScore | undefined>();
-  const [forTime, setForTime] = useState<ForTimeScore | undefined>();
-  const startedAt = useRef(Date.now());
-  const runCount = useRef(0);
+  const [index, setIndex] = useState(resume?.index ?? 0);
+  const [phase, setPhase] = useState<Phase>(() => (resume ? restorePhase(resume.phase) : { kind: 'ready' }));
+  const [logs, setLogs] = useState<BlockLog[]>(resume?.logs ?? []);
+  const [entries, setEntries] = useState<LogEntry[]>(resume?.entries ?? []);
+  const [score, setScore] = useState<AmrapScore | undefined>(resume?.score);
+  const [forTime, setForTime] = useState<ForTimeScore | undefined>(resume?.forTime);
+  const startedAt = useRef(resume?.startedAt ?? Date.now());
+  const runCount = useRef(resume?.phase.kind === 'running' ? RESUMED_RUN : 0);
 
   useKeepAwake(settings.keepAwake);
+
+  // ---- saving progress ----
+  // The running block's position, as its runner last reported it.
+  const run = useRef<RunState | undefined>(resume?.run);
+  // Finished or thrown away: nothing more to save.
+  const closed = useRef(false);
+  const snapshot = (): ActiveWorkout | null => {
+    if (!routine) return null;
+    // Nothing done yet: choosing where to start isn't progress worth keeping.
+    if (!resume && logs.length === 0 && phase.kind === 'ready') return null;
+    const saved: SavedPhase =
+      phase.kind === 'running' ? { kind: 'running' } : phase.kind === 'break' ? { kind: 'ready', afterBreak: true } : phase;
+    return {
+      userId: user?.id ?? null,
+      routine,
+      index,
+      phase: saved,
+      logs,
+      entries,
+      score,
+      forTime,
+      run: phase.kind === 'running' ? run.current : undefined,
+      startedAt: startedAt.current,
+      savedAt: Date.now(),
+    };
+  };
+  const save = useRef(() => {});
+  save.current = () => {
+    if (closed.current) return;
+    const s = snapshot();
+    if (s) saveActiveWorkout(s);
+  };
+  const close = () => {
+    closed.current = true;
+    clearActiveWorkout();
+  };
+  useEffect(() => save.current(), [index, phase, logs, entries, score, forTime]);
+  useEffect(() => {
+    // the running clock moves without a re-render here, so save it every few seconds, and when the page goes away
+    const id = setInterval(() => save.current(), 2000);
+    const onHide = () => save.current();
+    const doc = typeof document !== 'undefined' ? document : null;
+    const onVisibility = () => doc?.visibilityState === 'hidden' && onHide();
+    if (typeof window !== 'undefined' && window.addEventListener) window.addEventListener('pagehide', onHide);
+    doc?.addEventListener?.('visibilitychange', onVisibility);
+    return () => {
+      clearInterval(id);
+      if (typeof window !== 'undefined' && window.removeEventListener) window.removeEventListener('pagehide', onHide);
+      doc?.removeEventListener?.('visibilitychange', onVisibility);
+      save.current();
+    };
+  }, []);
 
   const block = blocks[index];
 
@@ -125,6 +187,7 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
 
   const finishWorkout = (finalLogs: BlockLog[]) => {
     if (!routine) return;
+    close();
     if (finalLogs.length === 0) {
       nav.pop();
       return;
@@ -142,10 +205,11 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
     nav.reset('history');
   };
 
+  // Leaving keeps the progress (saved as it goes); Home and the routine offer to continue.
   const exit = () => {
     if (phase.kind === 'summary') return finishWorkout(logs);
-    if (logs.length === 0) return nav.pop();
-    confirm(t('run.exitConfirm'), () => finishWorkout(logs), t('run.exit'), t('common.cancel'));
+    save.current();
+    nav.pop();
   };
 
   if (!routine || !block) {
@@ -168,6 +232,10 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
         <BlockRunner
           key={phase.run}
           block={block}
+          resume={resume?.phase.kind === 'running' && phase.run === RESUMED_RUN ? resume.run : undefined}
+          report={(s) => {
+            run.current = s;
+          }}
           onFinish={(durationSec, amrap, ft) => {
             setEntries(defaultEntries(block, amrap?.rounds ?? (ft && ft.timeSec == null ? ft.rounds : undefined)));
             setScore(amrap);
@@ -309,7 +377,17 @@ export function WorkoutScreen({ routineId, routine: given }: { routineId: string
               label={t('run.discard')}
               variant="ghost"
               flex
-              onPress={() => confirm(t('common.confirmDelete'), () => nav.pop(), t('run.discard'), t('common.cancel'))}
+              onPress={() =>
+                confirm(
+                  t('common.confirmDelete'),
+                  () => {
+                    close();
+                    nav.pop();
+                  },
+                  t('run.discard'),
+                  t('common.cancel'),
+                )
+              }
             />
             <Button label={t('run.saveWorkout')} flex onPress={() => finishWorkout(logs)} />
           </Row>

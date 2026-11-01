@@ -2,9 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 // A pausable clock based on real timestamps, so it never drifts
 // even if the screen lags or the tab sleeps for a moment.
-export function useClock(tickMs = 100) {
+// startMs: where a paused clock starts (a workout resumed where it was left).
+export function useClock(tickMs = 100, startMs = 0) {
   const [running, setRunning] = useState(false);
-  const acc = useRef(0);
+  const acc = useRef(startMs);
   const since = useRef(0);
   const [, force] = useState(0);
 
