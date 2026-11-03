@@ -2,7 +2,7 @@
 // mode keeps the account on this device so the screens can be tried end to end.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 
 import type { Plan } from '../lib/plan';
 import { asProfile } from '../lib/profile';
@@ -169,7 +169,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (event === 'PASSWORD_RECOVERY') setRecovering(true);
         setUser(session ? fromSupabaseUser(session.user) : null);
       });
-      return () => data.subscription.unsubscribe();
+      // Roles (Pro, admin) live in the session token, which only refreshes about once an hour.
+      // Refresh it when the app comes back to the front, so Pro given or taken away by an admin
+      // shows the next time they open the app (at most every 5 minutes).
+      let lastRefresh = Date.now();
+      const refresh = () => {
+        if (Date.now() - lastRefresh < 5 * 60_000) return;
+        lastRefresh = Date.now();
+        client.auth
+          .getSession()
+          .then(({ data: d }) => (d.session ? client.auth.refreshSession() : null))
+          .catch(() => {});
+      };
+      const appState = AppState.addEventListener('change', (s) => s === 'active' && refresh());
+      const doc = Platform.OS === 'web' && typeof document !== 'undefined' ? document : null;
+      const onVisible = () => doc?.visibilityState === 'visible' && refresh();
+      doc?.addEventListener('visibilitychange', onVisible);
+      return () => {
+        data.subscription.unsubscribe();
+        appState.remove();
+        doc?.removeEventListener('visibilitychange', onVisible);
+      };
     }
     (async () => {
       try {

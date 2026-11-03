@@ -27,7 +27,7 @@ SadBarz has four roles. Each one is a flag in the account's **app_metadata**, wh
 | Role | Flag | What it gets | Status |
 | :--- | :--- | :--- | :--- |
 | **Athlete Free** | none (the default) | Up to 5 of their own routines, every timer and workout feature, and limited plan codes. | Works |
-| **Athlete Pro** | `"plan": "pro"` | No routine limit, unlimited plan codes, and the AI coach. | Works. Set by hand until Stripe (step 8) |
+| **Athlete Pro** | `"plan": "pro"` | No routine limit, unlimited plan codes, and the AI coach. | Works. Admins switch it in Home → Usuarios until Stripe (step 8) |
 | **Coach** | `"coach": true`, and always `"plan": "pro"` | Builds routines and weekly plans, gets a code for each, shares it, and sees how many people redeemed it (see [Later: professional coaches](#later-professional-coaches)). A coach account that isn't Pro gets no coach tools. Uzi approves who becomes a coach. | Planned |
 | **Admin** | `"admin": true` | Uzi. Reviews and approves AI coach plans, sees every code and redemption, has the Free/Pro view switch, and approves coaches. | Works |
 
@@ -61,7 +61,7 @@ The onboarding answers are saved in the account's user metadata under `profile` 
 
 **Routines, workouts, own exercises, settings, profile photo and PRs** are saved per user in the table `public.user_data` (one row per user, a JSON copy of their data). Row level security lets each signed-in user read and write only their own row. Create it once by pasting `supabase/migrations/20261024000000_user_data.sql` into **SQL Editor → New query → Run**. Each device keeps its own copy too (`sadbarz:v1:<user id>`), works offline, and merges with the cloud copy on sign in, when the app comes back to the front, and a moment after every change (`src/lib/sync.ts`). Settings → Datos shows whether the last sync worked.
 
-**Free vs Pro.** Free accounts keep up to 5 of their own routines (`FREE_ROUTINE_LIMIT` in `src/lib/plan.ts`; the example routines don't count). Creating or duplicating a 6th opens the Pro pop-up instead (`src/components/ProHost.tsx`), whose "Quiero Pro" button stores `pro_interest_at` in the user's metadata until payments exist. An account is Pro when its **app_metadata** has `"plan": "pro"`. Only the server can set that, so users can't upgrade themselves. To make an account Pro by hand, run this in the SQL Editor (the user signs out and in again to see it):
+**Free vs Pro.** Free accounts keep up to 5 of their own routines (`FREE_ROUTINE_LIMIT` in `src/lib/plan.ts`; the example routines don't count). Creating or duplicating a 6th opens the Pro pop-up instead (`src/components/ProHost.tsx`), whose "Quiero Pro" button stores `pro_interest_at` in the user's metadata until payments exist. An account is Pro when its **app_metadata** has `"plan": "pro"`. Only the server can set that, so users can't upgrade themselves. **Admins give or take away Pro in the app: Home → Usuarios** lists every account (search by email or name) with a Pro switch. It needs `supabase/migrations/20261103010000_admin_users.sql` run once in the SQL Editor (two admin-only functions, `admin_list_users` and `admin_set_plan`). The person sees the change the next time they open the app (the app refreshes the session when it comes back to the front, at most every 5 minutes). By hand instead, in the SQL Editor:
 
 ```sql
 update auth.users set raw_app_meta_data = raw_app_meta_data || '{"plan":"pro"}'::jsonb where email = 'their@email.com';

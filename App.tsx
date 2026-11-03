@@ -8,6 +8,7 @@ import { LogoMark } from './src/components/Logo';
 import { ProHost } from './src/components/ProHost';
 import { useT } from './src/i18n';
 import { NavProvider, useNav, type Route, type TabName } from './src/navigation';
+import { AdminUsersScreen } from './src/screens/AdminUsersScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
@@ -103,6 +104,8 @@ function renderRoute(r: Route) {
       return <CoachPlanScreen id={r.id} />;
     case 'myPlan':
       return <MyPlanScreen />;
+    case 'adminUsers':
+      return <AdminUsersScreen />;
   }
 }
 
