@@ -20,7 +20,8 @@ export type Route =
   | { name: 'editRecord'; id?: string; draft?: Partial<PersonalRecord> }
   | { name: 'coachReview' }
   | { name: 'coachPlan'; id: string }
-  | { name: 'myPlan' };
+  | { name: 'myPlan' }
+  | { name: 'adminUsers' };
 
 interface Nav {
   tab: TabName;
