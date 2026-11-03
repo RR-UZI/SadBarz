@@ -4,7 +4,7 @@
 // Any block can be edited mid-workout (✎): the running one pauses while it's edited and carries on from the same point.
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, View } from 'react-native';
+import { Platform, Pressable, View } from 'react-native';
 
 import { BlockEditor } from '../components/BlockEditor';
 import { BlockRunner } from '../components/BlockRunner';
@@ -32,15 +32,52 @@ type Phase =
   | { kind: 'break'; nextIndex: number; seconds: number }
   | { kind: 'summary' };
 
+// Keeps the screen on while a workout or timer runs.
+// On the web (iPhone Safari above all) the browser drops the wake lock every time the page is hidden:
+// the phone locking, unlocking with Face ID, a notification pulled down, another app. So it's asked for
+// again whenever the page comes back, and on the next tap if the browser refused it (Safari can want a tap).
 export function useKeepAwake(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
-    activateKeepAwakeAsync('sadbarz-workout').catch(() => {});
+    if (Platform.OS !== 'web') {
+      activateKeepAwakeAsync('sadbarz-workout').catch(() => {});
+      return () => {
+        // may reject if the lock never activated
+        Promise.resolve()
+          .then(() => deactivateKeepAwake('sadbarz-workout'))
+          .catch(() => {});
+      };
+    }
+    type Sentinel = { released: boolean; release: () => Promise<void> };
+    const wakeLock = typeof navigator !== 'undefined' ? (navigator as unknown as { wakeLock?: { request: (t: 'screen') => Promise<Sentinel> } }).wakeLock : undefined;
+    if (!wakeLock || typeof document === 'undefined') return;
+    let lock: Sentinel | null = null;
+    let asking = false;
+    let stopped = false;
+    const request = () => {
+      if (stopped || asking || (lock && !lock.released) || document.visibilityState !== 'visible') return;
+      asking = true;
+      wakeLock
+        .request('screen')
+        .then((l) => {
+          asking = false;
+          if (stopped) l.release().catch(() => {});
+          else lock = l;
+        })
+        .catch(() => {
+          asking = false;
+        });
+    };
+    request();
+    document.addEventListener('visibilitychange', request);
+    window.addEventListener('focus', request);
+    document.addEventListener('pointerdown', request, true);
     return () => {
-      // may reject if the lock never activated (e.g. browser refused it)
-      Promise.resolve()
-        .then(() => deactivateKeepAwake('sadbarz-workout'))
-        .catch(() => {});
+      stopped = true;
+      document.removeEventListener('visibilitychange', request);
+      window.removeEventListener('focus', request);
+      document.removeEventListener('pointerdown', request, true);
+      lock?.release().catch(() => {});
     };
   }, [enabled]);
 }
