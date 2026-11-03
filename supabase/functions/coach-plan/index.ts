@@ -409,7 +409,9 @@ Deno.serve(async (req) => {
   const { data: lastApproved } = await db.from('coach_plans').select('weeks, start_date, plan, approved_plan').eq('user_id', user.id).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
   const lastPlan = lastApproved ? { weeks: lastApproved.weeks, startDate: lastApproved.start_date, ...(lastApproved.approved_plan ?? lastApproved.plan) } : null;
   const startDate = typeof profile.startDate === 'string' && profile.startDate > today ? profile.startDate : today;
-  const name = typeof user.user_metadata?.name === 'string' ? user.user_metadata.name.slice(0, 80) : undefined;
+  // Email sign up stores `name`; Google fills `full_name` (and usually `name`).
+  const metaName = [user.user_metadata?.name, user.user_metadata?.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
+  const name = metaName ? metaName.trim().slice(0, 80) : undefined;
   const input: Stored = {
     ...athleteInput(profile, (row?.data ?? {}) as Synced, lastPlan, weeks, today, startDate, language),
     athlete: { name },

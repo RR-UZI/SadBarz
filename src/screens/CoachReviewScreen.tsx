@@ -81,9 +81,16 @@ export function CoachReviewScreen() {
     <Pressable key={p.id} onPress={() => nav.push({ name: 'coachPlan', id: p.id })} accessibilityRole="button">
       <Card>
         <Row style={{ justifyContent: 'space-between' }}>
-          <Txt style={{ fontWeight: '800', flex: 1 }} numberOfLines={1}>
-            {p.name || t('review.athlete')}
-          </Txt>
+          <View style={{ flex: 1 }}>
+            <Txt style={{ fontWeight: '800' }} numberOfLines={1}>
+              {p.name || p.email || t('review.athlete')}
+            </Txt>
+            {p.name && p.email ? (
+              <Txt variant="small" color={colors.muted} numberOfLines={1}>
+                {p.email}
+              </Txt>
+            ) : null}
+          </View>
           <StatusBadge status={p.status} />
         </Row>
         <Txt variant="small" color={colors.muted} style={{ marginTop: 4 }}>
@@ -228,7 +235,7 @@ export function CoachPlanScreen({ id }: { id: string }) {
 
   return (
     <Screen
-      title={plan.name || t('review.athlete')}
+      title={plan.name || plan.email || t('review.athlete')}
       onBack={nav.pop}
       right={<StatusBadge status={plan.status} />}
       footer={
@@ -272,6 +279,11 @@ export function CoachPlanScreen({ id }: { id: string }) {
         ) : undefined
       }
     >
+      {plan.email ? (
+        <Txt variant="small" color={colors.muted}>
+          {plan.email}
+        </Txt>
+      ) : null}
       <Txt variant="small" color={colors.muted}>
         {t('review.planOf', { weeks: t(`coach.weeks${plan.weeks}`), date: date(plan.createdAt) })}
       </Txt>

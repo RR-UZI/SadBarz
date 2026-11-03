@@ -101,7 +101,18 @@ export interface ReviewItem {
   createdAt: string;
   updatedAt: string;
   name?: string;
+  email?: string; // the account's email, so Uzi knows who asked (admins only)
   goal?: Goal;
+}
+
+/** The current name and email of whoever asked for each plan (answers admins only). Missing or failing: nothing. */
+async function planAthletes(ids: string[]): Promise<Map<string, { name?: string; email?: string }>> {
+  const out = new Map<string, { name?: string; email?: string }>();
+  if (!supabase || ids.length === 0) return out;
+  const { data, error } = await supabase.rpc('plan_athletes', { plan_ids: ids });
+  if (error || !Array.isArray(data)) return out;
+  for (const r of data as { plan_id: string; name: string | null; email: string | null }[]) out.set(r.plan_id, { name: r.name ?? undefined, email: r.email ?? undefined });
+  return out;
 }
 
 export interface ReviewPlan extends ReviewItem {
@@ -125,13 +136,15 @@ export async function reviewList(): Promise<{ pending: ReviewItem[]; recent: Rev
   ]);
   if (p.error) throw p.error;
   if (r.error) throw r.error;
+  const people = await planAthletes([...(p.data ?? []), ...(r.data ?? [])].map((x) => x.id as string));
   const item = (x: Record<string, unknown>): ReviewItem => ({
     id: x.id as string,
     status: x.status as CoachStatus,
     weeks: x.weeks as PlanWeeks,
     createdAt: x.created_at as string,
     updatedAt: x.updated_at as string,
-    name: (x.name as string | null) ?? undefined,
+    name: people.get(x.id as string)?.name ?? (x.name as string | null) ?? undefined,
+    email: people.get(x.id as string)?.email,
     goal: (x.goal as Goal | null) ?? undefined,
   });
   return { pending: (p.data ?? []).map(item), recent: (r.data ?? []).map(item) };
@@ -151,6 +164,7 @@ export async function loadPlan(id: string): Promise<ReviewPlan | null> {
   const read = data.status === 'approved' ? await supabase.rpc('plan_code', { plan_id: id }) : null;
   const code = (read?.data as string | null) ?? null;
   const codeError = read && !code ? read.error?.message ?? 'no code' : undefined;
+  const who = (await planAthletes([id])).get(id);
   return {
     id: data.id,
     status: data.status,
@@ -160,7 +174,8 @@ export async function loadPlan(id: string): Promise<ReviewPlan | null> {
     codeError,
     createdAt: data.created_at,
     updatedAt: data.updated_at,
-    name: input.athlete?.name,
+    name: who?.name ?? input.athlete?.name,
+    email: who?.email,
     goal: input.profile?.goal,
     input,
     plan: data.plan,
