@@ -5,7 +5,7 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 import type { ActiveWorkout } from './lib/activeWorkout';
 import type { Block, PersonalRecord, Routine } from './types';
 
-export type TabName = 'home' | 'routines' | 'timers' | 'history';
+export type TabName = 'home' | 'routines' | 'coach' | 'timers' | 'history';
 
 export type Route =
   | { name: 'routine'; id: string }
