@@ -5,12 +5,13 @@ import { ActivityIndicator, View } from 'react-native';
 
 import { Badge, Button, Card, Chip, Field, Row, Screen, Section, Txt } from '../components/ui';
 import { useT } from '../i18n';
-import { exercisesToReview, reviewExercise, type WaitingExercise } from '../lib/exercisePool';
+import { confirm } from '../lib/confirm';
+import { exercisesToReview, refreshPool, reviewExercise, type WaitingExercise } from '../lib/exercisePool';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
-import type { Category } from '../types';
+import type { Category, Exercise } from '../types';
 
 const CATEGORIES: Category[] = ['push', 'pull', 'tubos', 'legs', 'core', 'skills', 'cardio'];
 const norm = (s: string) =>
@@ -28,6 +29,10 @@ export function ExerciseReviewScreen() {
   const { user } = useAuth();
   const [list, setList] = useState<WaitingExercise[] | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+  // Name and group as edited on each card, so Approve all uses the fixes too.
+  const [edits, setEdits] = useState<Record<string, Edit>>({});
+  const [progress, setProgress] = useState<number | null>(null);
+  const { exercises } = useApp();
 
   const load = useCallback(() => {
     exercisesToReview()
@@ -38,6 +43,38 @@ export function ExerciseReviewScreen() {
       .catch((e: unknown) => setFailed(errorText(e)));
   }, []);
   useEffect(load, [load]);
+
+  const editOf = (ex: WaitingExercise): Edit => edits[ex.id] ?? { name: ex.name.trim(), category: ex.category };
+  const ready = (list ?? []).filter((ex) => editOf(ex).name.trim());
+  const twins = ready.filter((ex) => twinOf(exercises, ex.id, editOf(ex).name)).length;
+
+  // One at a time, so a failure stops it with the approved ones already off the list.
+  const approveAll = () => {
+    const todo = ready;
+    confirm(
+      t('exReview.approveAllAsk', { n: todo.length }) + (twins ? `\n\n${t('exReview.approveAllTwins', { n: twins })}` : ''),
+      async () => {
+        setFailed(null);
+        let done = 0;
+        setProgress(0);
+        try {
+          for (const ex of todo) {
+            const e = editOf(ex);
+            await reviewExercise(ex, true, e.name, e.category, false);
+            done += 1;
+            setProgress(done);
+            setList((l) => l?.filter((x) => x.id !== ex.id) ?? l);
+          }
+        } catch (err) {
+          setFailed(errorText(err));
+        }
+        setProgress(null);
+        if (done) refreshPool(true).catch(() => {});
+      },
+      t('exReview.approveAll'),
+      t('common.cancel'),
+    );
+  };
 
   if (!user?.admin) {
     return (
@@ -65,8 +102,22 @@ export function ExerciseReviewScreen() {
         </Txt>
       ) : (
         <View style={{ gap: space.md, marginTop: space.lg }}>
+          {list.length > 1 ? (
+            <Button
+              label={progress !== null ? t('exReview.approving', { n: progress, total: progress + list.length }) : `✓ ${t('exReview.approveAll')} (${ready.length})`}
+              disabled={progress !== null || !ready.length}
+              onPress={approveAll}
+            />
+          ) : null}
           {list.map((ex) => (
-            <WaitingCard key={ex.id} ex={ex} onDone={() => setList((l) => l?.filter((x) => x.id !== ex.id) ?? l)} />
+            <WaitingCard
+              key={ex.id}
+              ex={ex}
+              edit={editOf(ex)}
+              onEdit={(e) => setEdits((m) => ({ ...m, [ex.id]: e }))}
+              locked={progress !== null}
+              onDone={() => setList((l) => l?.filter((x) => x.id !== ex.id) ?? l)}
+            />
           ))}
         </View>
       )}
@@ -74,16 +125,22 @@ export function ExerciseReviewScreen() {
   );
 }
 
-function WaitingCard({ ex, onDone }: { ex: WaitingExercise; onDone: () => void }) {
+type Edit = { name: string; category: Category };
+
+// One with the same name already in everyone's list (built in or approved): probably a duplicate.
+const twinOf = (exercises: Exercise[], id: string, name: string) => exercises.find((e) => e.id !== id && !e.custom && norm(e.name) === norm(name));
+
+function WaitingCard({ ex, edit, onEdit, locked, onDone }: { ex: WaitingExercise; edit: Edit; onEdit: (e: Edit) => void; locked: boolean; onDone: () => void }) {
   const t = useT();
   const { exercises } = useApp();
-  const [name, setName] = useState(ex.name.trim());
-  const [category, setCategory] = useState<Category>(ex.category);
-  const [busy, setBusy] = useState(false);
+  const { name, category } = edit;
+  const setName = (v: string) => onEdit({ name: v, category });
+  const setCategory = (c: Category) => onEdit({ name, category: c });
+  const [working, setBusy] = useState(false);
+  const busy = working || locked;
   const [problem, setProblem] = useState<string | null>(null);
 
-  // One with the same name already in everyone's list (built in or approved): probably a duplicate.
-  const twin = useMemo(() => exercises.find((e) => e.id !== ex.id && !e.custom && norm(e.name) === norm(name)), [exercises, ex.id, name]);
+  const twin = useMemo(() => twinOf(exercises, ex.id, name), [exercises, ex.id, name]);
 
   const decide = (approve: boolean) => {
     setBusy(true);
