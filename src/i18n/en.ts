@@ -169,6 +169,7 @@ export const en: Record<StringKey, string> = {
   'run.upNext': 'Next block',
   'run.editBlock': 'Edit block',
   'run.editPaused': 'The timer is paused while you edit. Save and you carry on from the same point.',
+  'run.editDuringRest': 'The rest keeps counting while you edit.',
   'run.editHint': 'The change is for this workout.',
   'run.saveAndContinue': 'Save and continue',
   'run.alsoRoutine': 'Also save it in the routine',

@@ -3,7 +3,7 @@
 // Progress is saved on the device as it goes: leaving with the back button keeps it, and Home offers to continue.
 // Any block can be edited mid-workout (✎): the running one pauses while it's edited and carries on from the same point.
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 
 import { BlockEditor } from '../components/BlockEditor';
@@ -16,7 +16,6 @@ import { type ActiveWorkout, clearActiveWorkout, type RunState, saveActiveWorkou
 import { defaultEntries, flattenSets, forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
 import { sounds, unlockAudio } from '../lib/sound';
-import { useClock } from '../lib/useClock';
 import { clock, uid } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
@@ -128,6 +127,21 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
   const [alsoRoutine, setAlsoRoutine] = useState(false);
 
   useKeepAwake(settings.keepAwake);
+
+  // ---- the rest clock ----
+  // Kept here, by wall-clock time, not inside the rest screen: editing a block during the rest takes that
+  // screen away, and the rest has to keep counting (and end) while the block is edited.
+  const [rest, setRest] = useState<RestClock | null>(null);
+  const restFired = useRef(false);
+  const restBeep = useRef('');
+  const [, restTick] = useState(0);
+  const resting = phase.kind === 'break' && !!rest;
+  const restLeft = rest ? Math.max(0, (rest.endsAt != null ? rest.endsAt - Date.now() : rest.leftMs) / 1000) : 0;
+  useEffect(() => {
+    if (!resting || rest?.endsAt == null) return;
+    const id = setInterval(() => restTick((x) => x + 1), 100);
+    return () => clearInterval(id);
+  }, [resting, rest?.endsAt]);
 
   // ---- saving progress ----
   // The running block's position, as its runner last reported it.
@@ -249,12 +263,46 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
       setPhase({ kind: 'ready' });
       return;
     }
+    restFired.current = false;
+    restBeep.current = '';
+    setRest({ total: seconds, endsAt: Date.now() + seconds * 1000, leftMs: seconds * 1000 });
     setPhase({ kind: 'break', nextIndex, seconds });
   };
 
   const breakOver = () => {
     if (settings.autoStartNext) startBlock();
     else setPhase({ kind: 'ready', afterBreak: true });
+  };
+
+  // Beeps in the last seconds, and the end: the next block (or its Start screen). If the rest ends while a block
+  // is being edited, it waits on the Start screen when the editor closes, so nothing starts behind the editor.
+  useEffect(() => {
+    if (!resting) return;
+    if (restLeft <= 0) {
+      if (restFired.current) return;
+      restFired.current = true;
+      if (settings.endSound) sounds.end(settings.vibration);
+      if (!editing) breakOver();
+      return;
+    }
+    const whole = Math.ceil(restLeft);
+    if (settings.lastBeepsSec > 0 && whole <= settings.lastBeepsSec && `${whole}` !== restBeep.current) {
+      restBeep.current = `${whole}`;
+      sounds.tick(settings.vibration);
+    }
+  });
+  const restControls = {
+    plus15: () => setRest((r) => (r ? { total: r.total + 15, endsAt: r.endsAt != null ? r.endsAt + 15000 : null, leftMs: r.leftMs + 15000 } : r)),
+    toggle: () =>
+      setRest((r) => {
+        if (!r) return r;
+        if (r.endsAt != null) return { ...r, endsAt: null, leftMs: Math.max(0, r.endsAt - Date.now()) };
+        return { ...r, endsAt: Date.now() + r.leftMs };
+      }),
+    skip: () => {
+      restFired.current = true;
+      breakOver();
+    },
   };
 
   const finishWorkout = (finalLogs: BlockLog[]) => {
@@ -310,10 +358,15 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
     run.current = s;
     setPhase({ kind: 'running', run: runCount.current });
   };
+  // The rest ran out while the editor was open: wait on the Start screen.
+  const restOverWhileEditing = () => {
+    if (phase.kind === 'break' && restFired.current) setPhase({ kind: 'ready', afterBreak: true });
+  };
   const cancelEdit = () => {
     if (!editing) return;
     setEditing(null);
     backToRun(editing.before, editing.before);
+    restOverWhileEditing();
   };
   const saveEdit = () => {
     if (!editing) return;
@@ -324,6 +377,7 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
     if (alsoRoutine && saved) saveRoutine(swap(saved));
     setEditing(null);
     backToRun(editing.before, b);
+    restOverWhileEditing();
   };
   if (editing) {
     const saved = routines.some((r) => r.id === routine.id && r.blocks.some((x) => x.id === editing.draft.id));
@@ -339,8 +393,18 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
           </Row>
         }
       >
+        {resting ? (
+          <Card style={{ borderColor: colors.rest, marginBottom: space.md }}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Txt variant="label" color={colors.rest}>
+                {restLeft > 0 ? t('run.rest') : t('run.breakOver')}
+              </Txt>
+              <Txt style={{ fontSize: 28, fontWeight: '900', color: colors.rest, fontVariant: ['tabular-nums'] }}>{clock(restLeft)}</Txt>
+            </Row>
+          </Card>
+        ) : null}
         <Txt variant="small" color={colors.muted} style={{ marginBottom: space.md }}>
-          {runningThis ? t('run.editPaused') : t('run.editHint')}
+          {runningThis ? t('run.editPaused') : resting ? t('run.editDuringRest') : t('run.editHint')}
         </Txt>
         <BlockEditor block={editing.draft} onChange={(draft) => setEditing((e) => (e ? { ...e, draft } : e))} />
         {saved ? (
@@ -484,7 +548,7 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
   if (phase.kind === 'break') {
     return (
       <Screen title={t('run.rest')} onBack={exit}>
-        <BreakCountdown seconds={phase.seconds} onDone={breakOver} />
+        {rest ? <BreakCountdown left={restLeft} total={rest.total} running={rest.endsAt != null} {...restControls} /> : null}
         {feedback ? <View style={{ marginTop: space.lg }}>{feedback}</View> : null}
         <Card style={{ marginTop: space.lg }}>
           <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
@@ -694,39 +758,12 @@ function EntryEditor({ entries, onChange, sets }: { entries: LogEntry[]; onChang
   );
 }
 
-function BreakCountdown({ seconds, onDone }: { seconds: number; onDone: () => void }) {
+// The rest clock: the time is kept by the workout screen (see `rest` there), this only shows it.
+type RestClock = { total: number; endsAt: number | null; leftMs: number };
+
+function BreakCountdown({ left, total, running, plus15, toggle, skip }: { left: number; total: number; running: boolean; plus15: () => void; toggle: () => void; skip: () => void }) {
   const t = useT();
-  const { settings } = useApp();
-  const c = useClock(100);
-  const [dur, setDur] = useState(seconds);
-  const lastTick = useRef('');
-  const fired = useRef(false);
-
-  useEffect(() => {
-    c.start();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const remaining = dur - c.elapsedMs / 1000;
-
-  useEffect(() => {
-    if (remaining <= 0) {
-      if (!fired.current) {
-        fired.current = true;
-        if (settings.endSound) sounds.end(settings.vibration);
-        onDone();
-      }
-      return;
-    }
-    const whole = Math.ceil(remaining);
-    if (settings.lastBeepsSec > 0 && whole <= settings.lastBeepsSec && `${whole}` !== lastTick.current) {
-      lastTick.current = `${whole}`;
-      sounds.tick(settings.vibration);
-    }
-  });
-
-  const progress = useMemo(() => Math.max(0, Math.min(1, 1 - remaining / Math.max(1, dur))), [remaining, dur]);
-
+  const progress = Math.max(0, Math.min(1, 1 - left / Math.max(1, total)));
   return (
     <View>
       <View style={{ height: 6, backgroundColor: colors.surface2, borderRadius: radius.pill, overflow: 'hidden' }}>
@@ -736,21 +773,12 @@ function BreakCountdown({ seconds, onDone }: { seconds: number; onDone: () => vo
         <Txt variant="label" color={colors.rest}>
           {t('run.rest')}
         </Txt>
-        <Txt style={{ fontSize: 96, fontWeight: '900', color: colors.rest, lineHeight: 108, fontVariant: ['tabular-nums'] }}>{clock(Math.max(0, remaining))}</Txt>
+        <Txt style={{ fontSize: 96, fontWeight: '900', color: colors.rest, lineHeight: 108, fontVariant: ['tabular-nums'] }}>{clock(left)}</Txt>
       </View>
       <Row>
-        <Button label={t('run.plus15')} variant="secondary" size="lg" flex onPress={() => setDur((d) => d + 15)} />
-        <Button label={c.running ? t('common.pause') : t('common.resume')} variant="secondary" size="lg" flex onPress={() => (c.running ? c.pause() : c.start())} />
-        <Button
-          label={t('run.skipRest')}
-          variant="rest"
-          size="lg"
-          flex
-          onPress={() => {
-            fired.current = true;
-            onDone();
-          }}
-        />
+        <Button label={t('run.plus15')} variant="secondary" size="lg" flex onPress={plus15} />
+        <Button label={running ? t('common.pause') : t('common.resume')} variant="secondary" size="lg" flex onPress={toggle} />
+        <Button label={t('run.skipRest')} variant="rest" size="lg" flex onPress={skip} />
       </Row>
     </View>
   );
