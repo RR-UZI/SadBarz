@@ -104,11 +104,9 @@ export function ExercisePicker({ visible, onClose, onPick }: { visible: boolean;
                   ))}
                 </Row>
               </View>
-              {editing ? (
-                <Txt variant="tiny" color={colors.faint}>
-                  {t('exercise.editHint')}
-                </Txt>
-              ) : null}
+              <Txt variant="tiny" color={colors.faint}>
+                {editing ? t('exercise.editHint') : t('exercise.poolHint')}
+              </Txt>
               <Button label={t('common.save')} onPress={create} disabled={!newName.trim()} />
             </View>
           ) : (

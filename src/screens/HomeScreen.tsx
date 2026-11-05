@@ -18,6 +18,7 @@ import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
 import { UsersHomeCard } from './AdminUsersScreen';
 import { ReviewHomeCard } from './CoachReviewScreen';
+import { ExerciseReviewHomeCard } from './ExerciseReviewScreen';
 import { MyPlanHomeCard } from './MyPlanScreen';
 import { WorkoutCard } from './HistoryScreen';
 
@@ -126,6 +127,7 @@ export function HomeScreen() {
       {/* Uzi's review list: real admins on a real account (the plans live on the server). */}
       {user?.admin && syncEnabled ? <ReviewHomeCard /> : null}
       {/* Admins give or take away Pro here (in the preview: the accounts on this device). */}
+      {user?.admin ? <ExerciseReviewHomeCard /> : null}
       {user?.admin ? <UsersHomeCard /> : null}
 
       <Section title={t('home.coachTitle')} right={<Badge label="PRO" color={colors.accent} textColor={colors.accentText} />}>

@@ -13,6 +13,7 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ProfileScreen, RecordEditorScreen } from './src/screens/ProfileScreen';
+import { ExerciseReviewScreen } from './src/screens/ExerciseReviewScreen';
 import { EditProfileScreen, OnboardingScreen } from './src/screens/OnboardingScreen';
 import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
@@ -106,6 +107,8 @@ function renderRoute(r: Route) {
       return <MyPlanScreen />;
     case 'adminUsers':
       return <AdminUsersScreen />;
+    case 'exerciseReview':
+      return <ExerciseReviewScreen />;
   }
 }
 

@@ -6,6 +6,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState, Platform } from 'react-native';
 
 import { SEED_EXERCISES, seedRoutines } from '../data/seed';
+import { useExercisePool } from '../lib/exercisePool';
 import { setVolume } from '../lib/sound';
 import { mergeSynced, pullRemote, pushRemote, syncEnabled, syncedKey, type Synced } from '../lib/sync';
 import type { Exercise, PersonalRecord, Routine, Settings, Workout } from '../types';
@@ -255,7 +256,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     return () => sub.remove();
   }, [syncNow]);
 
-  const exerciseById = useCallback((id: string) => data.exercises.find((e) => e.id === id), [data.exercises]);
+  // The user's exercises (seed + their own), then the approved ones from the shared pool they don't have.
+  const pool = useExercisePool();
+  const exercises = useMemo(() => {
+    const have = new Set(data.exercises.map((e) => e.id));
+    const extra = pool.filter((e) => !have.has(e.id));
+    return extra.length ? [...data.exercises, ...extra] : data.exercises;
+  }, [data.exercises, pool]);
+  const exerciseById = useCallback((id: string) => exercises.find((e) => e.id === id), [exercises]);
 
   const saveRoutine = useCallback((r: Routine) => {
     setData((d) => {
@@ -317,8 +325,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const value = useMemo<AppContextValue>(
-    () => ({ ...data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples }),
-    [data, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples],
+    () => ({ ...data, exercises, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples }),
+    [data, exercises, ready, sync, syncNow, exerciseById, saveRoutine, deleteRoutine, saveWorkout, deleteWorkout, addExercise, updateExercise, updateSettings, setAvatar, saveRecord, deleteRecord, reloadExamples],
   );
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>;
