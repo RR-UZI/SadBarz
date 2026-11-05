@@ -67,6 +67,8 @@ The onboarding answers are saved in the account's user metadata under `profile` 
 update auth.users set raw_app_meta_data = raw_app_meta_data || '{"plan":"pro"}'::jsonb where email = 'their@email.com';
 ```
 
+**Shared exercise pool.** Anyone can make their own exercise in the exercise picker and use it right away (it's saved with their data, as before). Every exercise someone makes also waits for an admin in **Home → Ejercicios nuevos**: approving it (after fixing its name or group if needed) adds it to the table `shared_exercises`, which every account reads and shows in its exercise list; rejecting it leaves it only with the person who made it. The waiting list is read straight from everyone's synced data, so nothing extra is sent from the app; a warning shows when the name matches one already in the list. Needs `supabase/migrations/20261105000000_exercise_pool.sql` run once (`src/lib/exercisePool.ts`, `src/screens/ExerciseReviewScreen.tsx`).
+
 **Admin Free/Pro switch.** An account whose app_metadata has `"admin": true` sees a FREE/PRO pill on Home (and a "Ver la app como" switch in Settings) that flips what the app shows, to try both plans. It only changes the view on that device (`sadbarz:plan-view`), never the real plan, and no other account sees it. In the preview build every account has it. To make the owner's account admin:
 
 ```sql
@@ -95,6 +97,7 @@ Setup, once:
    Then `supabase/migrations/20261029000000_plan_coach_exercises.sql` (adds the coach's own exercises to plans approved before the app did it).
    Then `supabase/migrations/20261030000000_code_routine_updates.sql` (routines from codes follow the plan).
    Then `supabase/migrations/20261103000000_plan_athletes.sql` (the review list shows who asked: their name and email).
+   Then `supabase/migrations/20261105000000_exercise_pool.sql` (the shared exercise pool, see below).
 2. **Edge Functions → Secrets**: `ANTHROPIC_API_KEY` (never in the app or the repo).
 3. **Edge Functions → Deploy a new function → Via Editor**, name it `coach-plan`, paste `supabase/functions/coach-plan/index.ts`, deploy. The function checks the athlete's session itself, so if every call fails with "Invalid JWT" (projects on the new signing keys), turn "Verify JWT" off for it. With the Supabase CLI instead: `supabase functions deploy coach-plan`.
 

@@ -11,6 +11,7 @@ export interface Exercise {
   category: Category;
   custom?: boolean;
   updatedAt?: number; // set when renamed, so the newest name wins in sync
+  shared?: boolean; // from the shared pool (someone else's, approved by an admin); never saved in the user's data
 }
 
 // One move inside a block, with its target.

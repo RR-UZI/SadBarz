@@ -21,7 +21,8 @@ export type Route =
   | { name: 'coachReview' }
   | { name: 'coachPlan'; id: string }
   | { name: 'myPlan' }
-  | { name: 'adminUsers' };
+  | { name: 'adminUsers' }
+  | { name: 'exerciseReview' };
 
 interface Nav {
   tab: TabName;
