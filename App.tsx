@@ -19,6 +19,7 @@ import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
 import { RoutinesScreen } from './src/screens/RoutinesScreen';
 import { CoachPlanScreen, CoachReviewScreen } from './src/screens/CoachReviewScreen';
+import { CoachScreen } from './src/screens/CoachScreen';
 import { MyPlanScreen } from './src/screens/MyPlanScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { QuickTimerScreen, StopwatchScreen, TimersScreen } from './src/screens/TimersScreen';
@@ -69,6 +70,7 @@ function Root() {
       <View style={{ flex: 1 }}>
         {tab === 'home' && <HomeScreen />}
         {tab === 'routines' && <RoutinesScreen />}
+        {tab === 'coach' && <CoachScreen />}
         {tab === 'timers' && <TimersScreen />}
         {tab === 'history' && <HistoryScreen />}
       </View>
@@ -115,6 +117,7 @@ function renderRoute(r: Route) {
 const TABS: { name: TabName; icon: string }[] = [
   { name: 'home', icon: '⌂' },
   { name: 'routines', icon: '☰' },
+  { name: 'coach', icon: '' },
   { name: 'timers', icon: '' },
   { name: 'history', icon: '▤' },
 ];
@@ -146,6 +149,8 @@ function TabBar() {
           >
             {tb.name === 'timers' ? (
               <TimerIcon color={active ? colors.accent : colors.faint} />
+            ) : tb.name === 'coach' ? (
+              <ChatIcon color={active ? colors.accent : colors.faint} />
             ) : (
               <Text style={{ fontSize: 20, lineHeight: 24, color: active ? colors.accent : colors.faint }}>{tb.icon}</Text>
             )}
@@ -153,6 +158,20 @@ function TabBar() {
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+// Drawn speech bubble for the Coach tab (emoji bubbles don't take the tab's color).
+function ChatIcon({ color }: { color: string }) {
+  return (
+    <View style={{ width: 24, height: 24, alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 21, height: 15, borderRadius: 6, borderWidth: 2, borderColor: color, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 2 }}>
+        {[0, 1, 2].map((i) => (
+          <View key={i} style={{ width: 3, height: 3, borderRadius: 2, backgroundColor: color }} />
+        ))}
+      </View>
+      <View style={{ position: 'absolute', bottom: 2, left: 5, width: 0, height: 0, borderLeftWidth: 0, borderRightWidth: 6, borderTopWidth: 5, borderRightColor: 'transparent', borderTopColor: color }} />
     </View>
   );
 }
