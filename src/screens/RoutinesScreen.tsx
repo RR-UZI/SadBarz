@@ -75,7 +75,7 @@ export function BlockSummary({ block, index, names }: { block: Block; index?: nu
             `${r.sets}x  ${r.items
               .map(
                 (it) =>
-                  `${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${it.weightKg ? ` +${it.weightKg}kg` : ''}${it.note ? ` (${it.note})` : ''}`,
+                  `${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${it.weightKg ? ` +${it.weightKg}kg` : ''}${it.band ? ` · ${t(`band.${it.band}`).toLowerCase()}` : ''}${it.note ? ` (${it.note})` : ''}`,
               )
               .join('  +  ')}${r.restSec ? `   ·  ${t('block.rest').toLowerCase()} ${r.restSec}"` : ''}`,
         )
@@ -83,7 +83,7 @@ export function BlockSummary({ block, index, names }: { block: Block; index?: nu
           (it, i) =>
             `${block.perRound === 'rotate' ? `${t('common.round')} ${turns[i] + 1}: ` : ''}${itemTarget(it, t('run.max'))} ${exerciseById(it.exerciseId)?.name ?? names?.[it.exerciseId] ?? '?'}${
               it.weightKg ? ` +${it.weightKg}kg` : ''
-            }${it.note ? ` (${it.note})` : ''}`,
+            }${it.band ? ` · ${t(`band.${it.band}`).toLowerCase()}` : ''}${it.note ? ` (${it.note})` : ''}`,
         );
   return (
     <View style={{ gap: 4 }}>

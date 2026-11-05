@@ -165,6 +165,7 @@ export function WorkoutDetailScreen({ id }: { id: string }) {
                   {e.meters ? `${e.meters} m` : ''}
                   {e.calories ? `${e.calories} cal` : ''} {exerciseById(e.exerciseId)?.name ?? '?'}
                   {e.weightKg ? <Txt variant="small" color={colors.accent}>{` +${e.weightKg}kg`}</Txt> : null}
+                  {e.band ? <Txt variant="small" color={colors.muted}>{` · ${t(`band.${e.band}`).toLowerCase()}`}</Txt> : null}
                 </Txt>
               ))}
             </View>

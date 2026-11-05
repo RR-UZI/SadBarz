@@ -658,7 +658,10 @@ function EntryEditor({ entries, onChange, sets }: { entries: LogEntry[]; onChang
         const ex = exerciseById(e.exerciseId);
         return (
           <View key={i} style={{ gap: 6, paddingBottom: space.sm, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <Txt style={{ fontWeight: '700' }}>{ex?.name ?? '?'}</Txt>
+            <Txt style={{ fontWeight: '700' }}>
+              {ex?.name ?? '?'}
+              {e.band ? <Txt color={colors.muted} style={{ fontWeight: '400' }}>{` · ${t(`band.${e.band}`).toLowerCase()}`}</Txt> : null}
+            </Txt>
             <Row gap={space.md} style={{ flexWrap: 'wrap' }}>
               <NumberField label={sets ? t('run.setsDone') : t('run.roundsDone')} value={e.rounds} width={44} onChange={(v) => update(i, { rounds: v ?? 0 })} />
               {ex?.kind === 'reps' ? <NumberField label={t('block.reps')} value={e.reps} width={48} allowEmpty onChange={(v) => update(i, { reps: v })} /> : null}

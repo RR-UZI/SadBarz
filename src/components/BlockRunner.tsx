@@ -4,6 +4,7 @@ import { View } from 'react-native';
 
 import { useT } from '../i18n';
 import { buildTimeline, capLabel, DEFAULT_AMRAP_SEC, DEFAULT_FORTIME_SEC, flattenSets, forTimeText, itemTarget, itemsForRound, segmentAt, timelineLength } from '../lib/blocks';
+import { bandById } from '../lib/bands';
 import { sounds, speak, unlockAudio } from '../lib/sound';
 import { useClock } from '../lib/useClock';
 import { clock } from '../lib/util';
@@ -112,6 +113,7 @@ function ItemLines({ items, big, dim }: { items: BlockItem[]; big?: boolean; dim
         >
           {itemTarget(it, t('run.max'))} {exerciseById(it.exerciseId)?.name ?? '?'}
           {it.weightKg ? <Txt style={{ fontSize: big ? 26 : 15, fontWeight: '800' }} color={colors.accent}>{` +${it.weightKg}kg`}</Txt> : null}
+          {it.band ? <Txt style={{ fontSize: big ? 18 : 13, fontWeight: '700' }} color={bandById(it.band)?.hex === '#2B2B2B' ? colors.muted : bandById(it.band)?.hex}>{`  ● ${t(`band.${it.band}`)}`}</Txt> : null}
           {it.note ? <Txt style={{ fontSize: big ? 16 : 13 }} color={colors.muted}>{`  (${it.note})`}</Txt> : null}
         </Txt>
       ))}

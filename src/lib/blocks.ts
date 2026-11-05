@@ -150,6 +150,7 @@ export function defaultEntries(b: Block, roundsDone?: number): LogEntry[] {
     meters: it.meters,
     calories: it.calories,
     weightKg: it.weightKg,
+    band: it.band,
   });
   if (b.format === 'amrap') {
     return b.items.map((it) => fromItem(it, roundsDone ?? 0));
