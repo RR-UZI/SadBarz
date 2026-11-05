@@ -8,6 +8,7 @@ import { clock, shortDuration } from '../lib/util';
 import { useApp } from '../store/AppStore';
 import { colors, radius, space } from '../theme';
 import type { Block, BlockFormat, BlockItem, Exercise, SetRow } from '../types';
+import { BandPicker, BandPill } from './Band';
 import { DragList, moveItem } from './DragList';
 import { ExercisePicker } from './ExercisePicker';
 import { Button, Chip, Field, NumberField, Row, Segmented, Txt } from './ui';
@@ -284,6 +285,9 @@ function ItemEditor({
 }) {
   const t = useT();
   const [showNote, setShowNote] = useState(!!item.note);
+  const [showBands, setShowBands] = useState(false);
+  // Bands assist bodyweight moves counted in reps or seconds (pull ups, dips, muscle ups, holds).
+  const bandable = kind === 'reps' || kind === 'hold';
   return (
     <View style={{ backgroundColor: colors.surface2, borderRadius: radius.md, padding: space.md, gap: space.sm }}>
       <Row style={{ justifyContent: 'space-between' }}>
@@ -323,8 +327,18 @@ function ItemEditor({
         <NumberField label={t('block.weight')} value={item.weightKg} width={48} step={5} onChange={(v) => onChange({ ...item, weightKg: v || undefined })} allowEmpty />
         {kind === 'reps' ? <Chip label={t('block.max')} active={!!item.max} onPress={() => onChange({ ...item, max: !item.max })} /> : null}
         {sameRound != null && onSameRound ? <Chip label={t('block.sameRound')} active={sameRound} onPress={() => onSameRound(!sameRound)} /> : null}
+        {bandable ? <BandPill band={item.band} open={showBands} onPress={() => setShowBands((v) => !v)} /> : null}
         {!showNote ? <Chip label={t('block.addNote')} onPress={() => setShowNote(true)} /> : null}
       </Row>
+      {bandable && showBands ? (
+        <BandPicker
+          value={item.band}
+          onChange={(band) => {
+            onChange({ ...item, band });
+            setShowBands(false);
+          }}
+        />
+      ) : null}
       {showNote ? <Field value={item.note ?? ''} onChangeText={(v) => onChange({ ...item, note: v || undefined })} placeholder={t('block.notePlaceholder')} /> : null}
     </View>
   );
@@ -334,5 +348,6 @@ function ItemEditor({
 function swapExercise(item: BlockItem, ex: Exercise, oldKind?: Exercise['kind']): BlockItem {
   if (oldKind === ex.kind) return { ...item, exerciseId: ex.id };
   const fresh = newItem(ex.id, ex.kind);
-  return { ...item, exerciseId: ex.id, reps: fresh.reps, seconds: fresh.seconds, meters: fresh.meters, calories: fresh.calories, max: undefined };
+  const band = ex.kind === 'reps' || ex.kind === 'hold' ? item.band : undefined;
+  return { ...item, exerciseId: ex.id, reps: fresh.reps, seconds: fresh.seconds, meters: fresh.meters, calories: fresh.calories, max: undefined, band };
 }

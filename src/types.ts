@@ -2,6 +2,9 @@
 
 export type ExerciseKind = 'reps' | 'hold' | 'distance' | 'calories';
 
+/** Resistance band colors, lightest to strongest (src/lib/bands.ts has how much each one helps). */
+export type BandColor = 'yellow' | 'red' | 'black' | 'purple' | 'green' | 'blue';
+
 export type Category = 'push' | 'pull' | 'legs' | 'core' | 'tubos' | 'cardio' | 'skills';
 
 export interface Exercise {
@@ -23,6 +26,7 @@ export interface BlockItem {
   meters?: number;
   calories?: number;
   weightKg?: number;
+  band?: BandColor; // assisted with a resistance band
   max?: boolean; // "máximo": as many as possible
   note?: string; // DS, unbroken, explosivas, "resto del minuto: correr"...
   /** Alternating blocks: items with the same turn are done together in one round. */
@@ -87,6 +91,7 @@ export interface LogEntry {
   meters?: number;
   calories?: number;
   weightKg?: number;
+  band?: BandColor;
 }
 
 export interface BlockLog {
