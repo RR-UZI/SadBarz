@@ -6,7 +6,7 @@ import { AppState, Platform } from 'react-native';
 
 import type { Plan } from '../lib/plan';
 import { asProfile } from '../lib/profile';
-import { supabase } from '../lib/supabase';
+import { AUTH_STORAGE_KEY, supabase } from '../lib/supabase';
 import type { Profile } from '../types';
 
 export interface Account {
@@ -108,6 +108,12 @@ function fromSupabaseUser(u: { id: string; email?: string; user_metadata?: Recor
   };
 }
 
+// Couldn't reach Supabase (offline, timed out), as opposed to Supabase answering no.
+function isNetworkError(e: { name?: string; status?: number; message?: string }) {
+  const msg = (e.message ?? '').toLowerCase();
+  return e.name === 'AuthRetryableFetchError' || e.status === 0 || (e.status ?? 0) >= 500 || msg.includes('fetch') || msg.includes('network');
+}
+
 function mapError(e: { code?: string; message?: string; status?: number } | null | undefined): AuthError {
   if (!e) return 'unknown';
   const code = e.code ?? '';
@@ -160,25 +166,61 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           window.history.replaceState(null, '', pathname);
         }
       }
+      // Opening the app after a while away, the session token has expired and has to be renewed online.
+      // With no signal yet (the phone just unlocked, a gym with bad coverage) that fails or takes a long time,
+      // and the account was shown as signed out. Only Supabase saying the session is gone signs out now:
+      // otherwise the account saved on the device is used, and the session renews by itself once online.
+      let settled = false;
+      const fromDevice = async () => {
+        try {
+          const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
+          const saved = raw ? (JSON.parse(raw) as { user?: Parameters<typeof fromSupabaseUser>[0] }) : null;
+          return saved?.user?.id ? fromSupabaseUser(saved.user) : null;
+        } catch {
+          return null;
+        }
+      };
+      const settle = (u: Account | null) => {
+        if (settled) return;
+        settled = true;
+        setUser(u);
+        setReady(true);
+      };
+      const slow = setTimeout(() => fromDevice().then(settle), 4000);
       client.auth
         .getSession()
-        .then(({ data }) => setUser(data.session ? fromSupabaseUser(data.session.user) : null))
-        .catch(() => setUser(null))
-        .finally(() => setReady(true));
+        .then(async ({ data, error }) => {
+          if (data.session) return settle(fromSupabaseUser(data.session.user));
+          // A network problem, not a missing session: keep the account from the device.
+          settle(error && isNetworkError(error) ? await fromDevice() : null);
+        })
+        .catch(async () => settle(await fromDevice()))
+        .finally(() => clearTimeout(slow));
       const { data } = client.auth.onAuthStateChange((event, session) => {
         if (event === 'PASSWORD_RECOVERY') setRecovering(true);
+        // No session on the first event can just mean it couldn't be renewed yet (offline): the start-up above decides.
+        if (!session && event === 'INITIAL_SESSION') return;
+        settled = true;
         setUser(session ? fromSupabaseUser(session.user) : null);
+        setReady(true);
       });
-      // Roles (Pro, admin) live in the session token, which only refreshes about once an hour.
-      // Refresh it when the app comes back to the front, so Pro given or taken away by an admin
-      // shows the next time they open the app (at most every 5 minutes).
+      // Roles (Pro, admin) live in the account. Read them again when the app comes back to the front, so Pro
+      // given or taken away by an admin shows the next time they open the app (at most every 5 minutes).
+      // Reading the account doesn't touch the session; it's only renewed when a role actually changed.
       let lastRefresh = Date.now();
       const refresh = () => {
         if (Date.now() - lastRefresh < 5 * 60_000) return;
         lastRefresh = Date.now();
         client.auth
           .getSession()
-          .then(({ data: d }) => (d.session ? client.auth.refreshSession() : null))
+          .then(async ({ data: d }) => {
+            if (!d.session) return;
+            const { data: fresh, error } = await client.auth.getUser();
+            if (error || !fresh.user) return;
+            const roles = (m?: Record<string, unknown>) => JSON.stringify([m?.plan ?? null, m?.admin ?? null, m?.coach ?? null]);
+            if (roles(fresh.user.app_metadata) !== roles(d.session.user.app_metadata)) await client.auth.refreshSession();
+            else setUser(fromSupabaseUser(fresh.user));
+          })
           .catch(() => {});
       };
       const appState = AppState.addEventListener('change', (s) => s === 'active' && refresh());
@@ -186,6 +228,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const onVisible = () => doc?.visibilityState === 'visible' && refresh();
       doc?.addEventListener('visibilitychange', onVisible);
       return () => {
+        clearTimeout(slow);
         data.subscription.unsubscribe();
         appState.remove();
         doc?.removeEventListener('visibilitychange', onVisible);
