@@ -168,6 +168,7 @@ export const es = {
   'run.upNext': 'Siguiente bloque',
   'run.editBlock': 'Editar bloque',
   'run.editPaused': 'El tiempo está en pausa mientras editas. Al guardar sigues en el mismo punto.',
+  'run.editDuringRest': 'El descanso sigue corriendo mientras editas.',
   'run.editHint': 'El cambio vale para este entreno.',
   'run.saveAndContinue': 'Guardar y seguir',
   'run.alsoRoutine': 'Guardar también en la rutina',
