@@ -137,7 +137,8 @@ export async function exercisesToReview(): Promise<WaitingExercise[]> {
   return [...out.values()];
 }
 
-export async function reviewExercise(ex: WaitingExercise, approve: boolean, name: string, category: Category): Promise<void> {
+// `refresh` false skips reloading everyone's list (Approve all reloads it once at the end).
+export async function reviewExercise(ex: WaitingExercise, approve: boolean, name: string, category: Category, refresh = true): Promise<void> {
   if (supabase) {
     const { error } = await supabase.rpc('review_exercise', { exercise_id: ex.id, approve, new_name: name, new_category: category });
     if (error) throw error;
@@ -150,5 +151,5 @@ export async function reviewExercise(ex: WaitingExercise, approve: boolean, name
       await AsyncStorage.setItem(PREVIEW_POOL, JSON.stringify([...p, { id: ex.id, name: name.trim() || ex.name, kind: ex.kind, category }]));
     }
   }
-  if (approve) await refreshPool(true);
+  if (approve && refresh) await refreshPool(true);
 }
