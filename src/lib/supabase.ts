@@ -17,6 +17,9 @@ const previewOnly = process.env.EXPO_PUBLIC_ACCOUNTS === 'preview';
 const url = previewOnly ? undefined : process.env.EXPO_PUBLIC_SUPABASE_URL || SUPABASE_URL;
 const anonKey = previewOnly ? undefined : process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || SUPABASE_PUBLISHABLE_KEY;
 
+// Where supabase-js keeps the session (its default name for this project).
+export const AUTH_STORAGE_KEY = url ? `sb-${new URL(url).hostname.split('.')[0]}-auth-token` : '';
+
 export const supabase: SupabaseClient | null =
   url && anonKey
     ? createClient(url, anonKey, {
