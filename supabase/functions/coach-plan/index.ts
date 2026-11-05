@@ -68,6 +68,7 @@ Scale this down for everyone else: same structure and formats, lighter numbers, 
 - intermediate: pull ups, dips, push ups, muscle up progressions or a few muscle ups if they have them, some weighted work if they have weights.
 - advanced: Uzi's week is the reference.
 - Recent logs: if they did every round at the target, go a little higher; if they skipped blocks or did fewer reps, keep or lower. Respect what they actually did over what they answered.
+- Block feedback in the logs (optional, the athlete fills it in during the rest): feel is easy, good, hard or max (all out); paused means they had to stop the clock; note is their own words. Easy with every round done: go up. Hard, max or paused: keep the load or lower it, add rest, or split the reps. Take the notes seriously (pain, fatigue, technique trouble) and say in the summary when they changed something.
 
 ## Equipment and safety
 - Only use exercises their equipment allows: bar for pull/muscle up/toes to bar/hangs, dips or parallettes for dips, tubes for the tubos exercises, weights for any weightKg, rings for ring work. "none" = floor and bodyweight only.
@@ -292,7 +293,7 @@ interface Synced {
     routineName: string;
     totalBlocks?: number;
     note?: string;
-    blocks: { title: string; format: string; status: string; durationSec: number; entries: Record<string, unknown>[]; score?: unknown; forTime?: unknown }[];
+    blocks: { title: string; format: string; status: string; durationSec: number; entries: Record<string, unknown>[]; score?: unknown; forTime?: unknown; feel?: string; paused?: boolean; note?: string }[];
   }[];
   records?: { name: string; unit: string; value: number; reps?: number; date: string; note?: string }[];
 }
@@ -310,7 +311,7 @@ function athleteInput(profile: Record<string, unknown>, synced: Synced, lastPlan
       minutes: Math.round((w.finishedAt - w.startedAt) / 60000),
       blocksDone: `${w.blocks.filter((b) => b.status === 'done').length}/${w.totalBlocks ?? w.blocks.length}`,
       note: w.note,
-      blocks: w.blocks.map((b) => ({ title: b.title, format: b.format, status: b.status, sec: b.durationSec, done: b.entries, score: b.score, forTime: b.forTime })),
+      blocks: w.blocks.map((b) => ({ title: b.title, format: b.format, status: b.status, sec: b.durationSec, done: b.entries, score: b.score, forTime: b.forTime, feel: b.feel, paused: b.paused, note: b.note })),
     }));
   const { updatedAt: _u, version: _v, reminders: _r, reminderTime: _t, ...answers } = profile;
   return {

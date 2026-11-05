@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
+import { feedbackText } from '../components/BlockFeedback';
 import { forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
 import { clock, DAY_MS, startOfDay } from '../lib/util';
@@ -169,6 +170,11 @@ export function WorkoutDetailScreen({ id }: { id: string }) {
                 </Txt>
               ))}
             </View>
+            {feedbackText(t, b) ? (
+              <Txt variant="small" color={colors.muted} style={{ marginTop: space.sm, fontStyle: 'italic' }}>
+                {`📝 ${feedbackText(t, b)}`}
+              </Txt>
+            ) : null}
           </Card>
         ))}
       </View>

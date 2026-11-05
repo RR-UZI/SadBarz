@@ -103,7 +103,13 @@ export interface BlockLog {
   entries: LogEntry[];
   score?: AmrapScore; // amrap
   forTime?: ForTimeScore; // fortime
+  // Optional feedback from the rest screen, read by the AI coach.
+  feel?: BlockFeel;
+  paused?: boolean; // had to pause the clock
+  note?: string;
 }
+
+export type BlockFeel = 'easy' | 'good' | 'hard' | 'max';
 
 // AMRAP result: full rounds plus the reps done in the unfinished round.
 export interface AmrapScore {

@@ -7,6 +7,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, Pressable, View } from 'react-native';
 
 import { BlockEditor } from '../components/BlockEditor';
+import { BlockFeedback } from '../components/BlockFeedback';
 import { BlockRunner } from '../components/BlockRunner';
 import { LogoMark } from '../components/Logo';
 import { Badge, Button, Card, NumberField, Row, Screen, ToggleRow, Txt } from '../components/ui';
@@ -204,6 +205,17 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
     setLogs(next);
     return next;
   };
+
+  // Feedback on the block just finished (rest screens and the summary): edits the last log.
+  const lastLog = logs[logs.length - 1];
+  const feedback =
+    lastLog && lastLog.status === 'done' ? (
+      <BlockFeedback
+        key={logs.length}
+        log={lastLog}
+        onChange={(patch) => setLogs((ls) => ls.map((l, i) => (i === ls.length - 1 ? { ...l, ...patch } : l)))}
+      />
+    ) : null;
 
   // The next block with nothing logged, from `from` on, then any left before it (the athlete may have started mid-routine).
   const nextToDo = (from: number, done: BlockLog[]) => {
@@ -454,6 +466,7 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
           })}
           <Button label={t('run.skipBreak')} variant="ghost" onPress={() => startBreak(phase.nextIndex, 0)} />
         </View>
+        {feedback ? <View style={{ marginTop: space.xl }}>{feedback}</View> : null}
         {next ? (
           <Card style={{ marginTop: space.xl }}>
             <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
@@ -472,6 +485,7 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
     return (
       <Screen title={t('run.rest')} onBack={exit}>
         <BreakCountdown seconds={phase.seconds} onDone={breakOver} />
+        {feedback ? <View style={{ marginTop: space.lg }}>{feedback}</View> : null}
         <Card style={{ marginTop: space.lg }}>
           <Row style={{ justifyContent: 'space-between', marginBottom: space.sm }}>
             <Txt variant="label">
@@ -531,6 +545,7 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
             <BlockStatusRow key={b.id} index={i} title={b.title || b.format.toUpperCase()} status={statusOf(b)} />
           ))}
         </View>
+        {feedback ? <View style={{ marginTop: space.xl }}>{feedback}</View> : null}
       </Screen>
     );
   }
