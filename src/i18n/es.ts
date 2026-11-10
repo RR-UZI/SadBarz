@@ -324,6 +324,8 @@ export const es = {
   'auth.previewNoEmail': 'En modo prueba todavía no se mandan correos.',
   'auth.google': 'Continuar con Google',
   'auth.or': 'o con tu correo',
+  'auth.sessionLost': 'Tu sesión se cerró. Todo sigue guardado en este teléfono; entra de nuevo para subirlo a tu cuenta.',
+  'auth.signInAgain': 'Entrar',
   'auth.preview': 'Modo prueba: la cuenta se guarda solo en este dispositivo.',
   'auth.error.invalidEmail': 'Revisa tu correo, no parece válido.',
   'auth.error.weakPassword': 'La contraseña necesita al menos {n} caracteres.',

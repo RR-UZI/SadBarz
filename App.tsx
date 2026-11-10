@@ -33,15 +33,50 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <AppProvider>
-          <NavProvider>
+          <NavForUser>
             <StatusBar style="light" />
             <Root />
             <ConfirmHost />
             <ProHost />
-          </NavProvider>
+          </NavForUser>
         </AppProvider>
       </AuthProvider>
     </SafeAreaProvider>
+  );
+}
+
+// Each account starts on Home with no screens open. Signing in again used to bring back the screens left
+// open, so a workout open at sign out reopened from its first block (and its saved progress was overwritten);
+// now Home shows the unfinished workout to continue.
+function NavForUser({ children }: { children: React.ReactNode }) {
+  const { user } = useAuth();
+  return <NavProvider key={user?.id ?? ''}>{children}</NavProvider>;
+}
+
+// The session ended by itself (see sessionLost in store/Auth.tsx): everything keeps working on this device.
+function SessionLostBanner() {
+  const t = useT();
+  const { signInAgain } = useAuth();
+  const insets = useSafeAreaInsets();
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        backgroundColor: colors.surface2,
+        borderBottomWidth: 1,
+        borderBottomColor: colors.warn,
+        paddingTop: insets.top + 8,
+        paddingBottom: 8,
+        paddingHorizontal: 16,
+      }}
+    >
+      <Text style={{ flex: 1, color: colors.text, fontSize: 13 }}>{t('auth.sessionLost')}</Text>
+      <Pressable onPress={signInAgain} accessibilityRole="button" hitSlop={8}>
+        <Text style={{ color: colors.accent, fontWeight: '800', fontSize: 14 }}>{t('auth.signInAgain')}</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -63,10 +98,19 @@ function Root() {
   if (!auth.user.profile) return <OnboardingScreen />;
 
   const top = stack[stack.length - 1];
-  if (top) return <View style={{ flex: 1, backgroundColor: colors.bg }}>{renderRoute(top)}</View>;
+  // Not over a workout: signing in from there would leave it (it waits on Home either way).
+  const banner = auth.sessionLost && top?.name !== 'workout' ? <SessionLostBanner /> : null;
+  if (top)
+    return (
+      <View style={{ flex: 1, backgroundColor: colors.bg }}>
+        {banner}
+        {renderRoute(top)}
+      </View>
+    );
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      {banner}
       <View style={{ flex: 1 }}>
         {tab === 'home' && <HomeScreen />}
         {tab === 'routines' && <RoutinesScreen />}

@@ -325,6 +325,8 @@ export const en: Record<StringKey, string> = {
   'auth.previewNoEmail': 'Preview mode does not send emails yet.',
   'auth.google': 'Continue with Google',
   'auth.or': 'or with your email',
+  'auth.sessionLost': 'Your session ended. Everything is still saved on this phone; sign in again to back it up to your account.',
+  'auth.signInAgain': 'Sign in',
   'auth.preview': 'Preview mode: the account is saved on this device only.',
   'auth.error.invalidEmail': "Check your email, it doesn't look right.",
   'auth.error.weakPassword': 'The password needs at least {n} characters.',

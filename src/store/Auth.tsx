@@ -1,7 +1,7 @@
 // Who is signed in. Uses Supabase when it is configured; otherwise a preview
 // mode keeps the account on this device so the screens can be tried end to end.
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
 import type { Plan } from '../lib/plan';
@@ -44,6 +44,11 @@ interface AuthValue {
   mode: 'online' | 'preview';
   /** The user opened a password reset link and must choose a new password. */
   recovering: boolean;
+  /** The session ended by itself (it couldn't be renewed) and the account is kept on this device until
+   * the user signs in again: nothing is thrown away and a workout in progress isn't interrupted. */
+  sessionLost: boolean;
+  /** Leaves the kept account for the sign in screen (after sessionLost). */
+  signInAgain: () => void;
   /** A sign in link (Google, email confirmation) came back with an error. */
   linkError: AuthError | null;
   clearLinkError: () => void;
@@ -70,6 +75,18 @@ const AuthContext = createContext<AuthValue | null>(null);
 const PREVIEW_ACCOUNTS = 'sadbarz:preview-accounts';
 const PREVIEW_SESSION = 'sadbarz:preview-session';
 const PLAN_VIEW = 'sadbarz:plan-view';
+// The account last signed in on this device, until the user logs out. Kept when the session ends by itself.
+const LAST_ACCOUNT = 'sadbarz:last-account';
+
+async function lastAccount(): Promise<Account | null> {
+  try {
+    const raw = await AsyncStorage.getItem(LAST_ACCOUNT);
+    const a = raw ? (JSON.parse(raw) as Account) : null;
+    return a?.id ? a : null;
+  } catch {
+    return null;
+  }
+}
 
 type PreviewAccounts = Record<string, { id: string; name: string; hash: string; profile?: Profile; plan?: Plan }>;
 
@@ -138,7 +155,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [recovering, setRecovering] = useState(false);
   const [linkError, setLinkError] = useState<AuthError | null>(null);
   const [planView, setPlanViewState] = useState<Plan | null>(null);
+  const [sessionLost, setSessionLost] = useState(false);
+  // The user pressed Log out (or Sign in again): the session ending is meant, not something to ride out.
+  const leaving = useRef(false);
   const mode = supabase ? 'online' : 'preview';
+
+  // Remember the signed in account on this device (see LAST_ACCOUNT).
+  useEffect(() => {
+    if (supabase && user && !sessionLost) AsyncStorage.setItem(LAST_ACCOUNT, JSON.stringify(user)).catch(() => {});
+  }, [user, sessionLost]);
 
   useEffect(() => {
     AsyncStorage.getItem(PLAN_VIEW)
@@ -175,10 +200,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
           const raw = await AsyncStorage.getItem(AUTH_STORAGE_KEY);
           const saved = raw ? (JSON.parse(raw) as { user?: Parameters<typeof fromSupabaseUser>[0] }) : null;
-          return saved?.user?.id ? fromSupabaseUser(saved.user) : null;
+          return saved?.user?.id ? fromSupabaseUser(saved.user) : await keepLast();
         } catch {
-          return null;
+          return keepLast();
         }
+      };
+      // The session is gone but the user never logged out (the refresh token was refused: the phone froze the
+      // page while it was being renewed, a gym wifi answered instead of Supabase...). Throwing them to the sign
+      // in screen mid-workout lost the workout, so the account stays on the device, with a note to sign in again.
+      const keepLast = async () => {
+        const u = await lastAccount();
+        if (u) setSessionLost(true);
+        return u;
       };
       const settle = (u: Account | null) => {
         if (settled) return;
@@ -192,7 +225,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .then(async ({ data, error }) => {
           if (data.session) return settle(fromSupabaseUser(data.session.user));
           // A network problem, not a missing session: keep the account from the device.
-          settle(error && isNetworkError(error) ? await fromDevice() : null);
+          settle(error && isNetworkError(error) ? await fromDevice() : await keepLast());
         })
         .catch(async () => settle(await fromDevice()))
         .finally(() => clearTimeout(slow));
@@ -201,6 +234,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // No session on the first event can just mean it couldn't be renewed yet (offline): the start-up above decides.
         if (!session && event === 'INITIAL_SESSION') return;
         settled = true;
+        if (!session && !leaving.current) {
+          keepLast().then((u) => {
+            setUser((cur) => (u && (!cur || cur.id === u.id) ? (cur ?? u) : null));
+            setReady(true);
+          });
+          return;
+        }
+        if (session) setSessionLost(false);
         setUser(session ? fromSupabaseUser(session.user) : null);
         setReady(true);
       });
@@ -386,18 +427,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    leaving.current = true;
+    await AsyncStorage.removeItem(LAST_ACCOUNT).catch(() => {});
     if (supabase) {
       await supabase.auth.signOut().catch(() => {});
     } else {
       await AsyncStorage.removeItem(PREVIEW_SESSION).catch(() => {});
     }
     setRecovering(false);
+    setSessionLost(false);
     setUser(null);
+    leaving.current = false;
   }, []);
 
+  const signInAgain = useCallback(() => {
+    void signOut();
+  }, [signOut]);
+
   const value = useMemo<AuthValue>(
-    () => ({ ready, user: shown, mode, recovering, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, setPlanView, signOut }),
-    [ready, shown, mode, recovering, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, setPlanView, signOut],
+    () => ({ ready, user: shown, mode, recovering, sessionLost, signInAgain, linkError, clearLinkError: () => setLinkError(null), signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, setPlanView, signOut }),
+    [ready, shown, mode, recovering, sessionLost, signInAgain, linkError, signIn, signUp, canUseGoogle, signInWithGoogle, resetPassword, setNewPassword, saveProfile, markProInterest, setPlanView, signOut],
   );
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
