@@ -71,6 +71,9 @@ export interface Routine {
   note?: string;
   blocks: Block[];
   example?: boolean;
+  /** Examples: who it's for, and the Monday (YYYY-MM-DD) of the week it's the example of. */
+  level?: Level;
+  exampleWeek?: string;
   /** Added by redeeming a plan code (that code). Like the examples, it doesn't count toward the free limit. */
   fromCode?: string;
   /** For a routine from a code: the plan day it copies, and the plan version it has (so a fixed plan updates it). */

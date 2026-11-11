@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
+import { LevelBadge } from '../components/LevelBadge';
 import { RedeemCard, useCodeRoutineUpdates } from '../components/PlanCode';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
@@ -82,7 +83,10 @@ function RoutineCard({ routine: r, name, highlight, onPress }: { routine: Routin
             {r.blocks.length} {t('routines.blocks')}
           </Txt>
         </View>
-        {r.example ? <Badge label={t('common.example')} /> : null}
+        <Row gap={space.xs}>
+          <LevelBadge level={r.level} />
+          {r.example ? <Badge label={t('common.example')} /> : null}
+        </Row>
       </Row>
       <View style={{ marginTop: space.sm, gap: 2 }}>
         {r.blocks.slice(0, 4).map((b) => (

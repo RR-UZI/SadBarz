@@ -6,7 +6,8 @@ import { Avatar } from '../components/Avatar';
 import { CoachCard } from '../components/CoachCard';
 import { useCodeRoutineUpdates } from '../components/PlanCode';
 import { Badge, Button, Card, Row, Screen, Section, Txt } from '../components/ui';
-import { WEEK_ROUTINE_IDS } from '../data/seed';
+import { LevelBadge } from '../components/LevelBadge';
+import { LEVELS } from '../data/seed';
 import { useT } from '../i18n';
 import { formatLabel } from '../lib/blocks';
 import { fullProfile } from '../lib/questionnaire';
@@ -16,6 +17,7 @@ import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
+import type { Routine } from '../types';
 import { UsersHomeCard } from './AdminUsersScreen';
 import { ReviewHomeCard } from './CoachReviewScreen';
 import { ExerciseReviewHomeCard } from './ExerciseReviewScreen';
@@ -35,14 +37,16 @@ export function HomeScreen() {
   const minutes = Math.round(thisWeek.reduce((s, w) => s + (w.finishedAt - w.startedAt), 0) / 60000);
   const last = workouts[0];
   // With a plan (from the coach or a plan code) its routines replace the examples, then the user's own.
-  // Without one: the example week first (Monday to Friday, whatever order they're saved in), then the user's own.
+  // Without one: this week's examples first (the athlete's level, then the others), then the user's own.
   const plan = usePlanRoutines();
   const own = routines.filter((r) => !r.example && !r.fromCode);
-  const week = WEEK_ROUTINE_IDS.map((id) => routines.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r);
+  const mine = user?.profile?.level;
+  const levelOrder = (r: Routine) => (r.level === mine ? -1 : r.level ? LEVELS.indexOf(r.level) : LEVELS.length);
+  const week = routines.filter((r) => r.example).sort((a, b) => levelOrder(a) - levelOrder(b));
   const quick = (
     plan.length
       ? [...plan, ...own.map((r) => ({ routine: r, name: r.name, coach: false }))]
-      : [...week, ...routines.filter((r) => !WEEK_ROUTINE_IDS.includes(r.id))].map((r) => ({ routine: r, name: r.name, coach: false }))
+      : [...week, ...routines.filter((r) => !r.example)].map((r) => ({ routine: r, name: r.name, coach: false }))
   ).slice(0, 5);
 
   return (
@@ -116,13 +120,16 @@ export function HomeScreen() {
           {quick.map(({ routine: r, name, coach }) => (
             <Card key={r.id} onPress={() => nav.push(coach ? { name: 'myPlan' } : { name: 'routine', id: r.id })} style={{ paddingVertical: space.md }}>
               <Row style={{ justifyContent: 'space-between' }}>
-                <View style={{ flex: 1 }}>
+                <View style={{ flex: 1, gap: 2 }}>
                   <Txt style={{ fontWeight: '700' }} numberOfLines={1}>
                     {name}
                   </Txt>
-                  <Txt variant="small" color={colors.muted} numberOfLines={1}>
-                    {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))).join(' · ')}
-                  </Txt>
+                  <Row gap={space.xs}>
+                    <LevelBadge level={r.level} />
+                    <Txt variant="small" color={colors.muted} numberOfLines={1} style={{ flex: 1 }}>
+                      {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))).join(' · ')}
+                    </Txt>
+                  </Row>
                 </View>
                 <Button label={t('common.start')} size="sm" onPress={() => nav.push({ name: 'workout', routineId: r.id, routine: coach ? r : undefined })} />
               </Row>
