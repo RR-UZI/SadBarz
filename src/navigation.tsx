@@ -21,6 +21,7 @@ export type Route =
   | { name: 'coachReview' }
   | { name: 'coachPlan'; id: string }
   | { name: 'myPlan' }
+  | { name: 'coachNotes' }
   | { name: 'adminUsers' }
   | { name: 'exerciseReview' };
 

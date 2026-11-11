@@ -328,6 +328,14 @@ export function CoachPlanScreen({ id }: { id: string }) {
 
       <Answers plan={plan} />
 
+      {plan.input.coachNotes ? (
+        <Section title={t('review.coachNotes')}>
+          <Card>
+            <Txt variant="small">{plan.input.coachNotes}</Txt>
+          </Card>
+        </Section>
+      ) : null}
+
       {week ? (
         <>
           <Section title={t('review.coach')} right={edited ? <Badge label={t('review.edited')} color={colors.accent} textColor={colors.accentText} /> : undefined}>

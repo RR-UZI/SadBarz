@@ -158,3 +158,39 @@ export async function clearChat(userId: string): Promise<boolean> {
   await AsyncStorage.removeItem(cacheKey(userId)).catch(() => {});
   return true;
 }
+
+/**
+ * When the athlete opens the chat: the coach looks at the workouts it hasn't seen yet, updates its notes on the
+ * athlete and, when it has something to say about their latest training, writes to them. Null when there is
+ * nothing new (or it can't be reached: this is never an error the athlete needs to see).
+ */
+export async function checkIn(userId: string, before: ChatMessage[], language: Language): Promise<ChatMessage | null> {
+  if (!supabase) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke('coach-chat', { body: { checkIn: true, language } });
+    const m = (data as { message?: { id?: number | null; content?: unknown } | null } | null)?.message;
+    if (error || !m || typeof m.content !== 'string' || !m.content) return null;
+    const message: ChatMessage = { id: m.id ? String(m.id) : `local-${Date.now()}-c`, role: 'assistant', content: m.content, at: Date.now() };
+    keep(userId, [...before, message]);
+    return message;
+  } catch {
+    return null;
+  }
+}
+
+/** What the coach has learned about the athlete (table coach_notes). Null: none yet, or it can't be read. */
+export type CoachNotes = { notes: string; updatedAt: number };
+
+export async function loadNotes(userId: string): Promise<CoachNotes | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase.from('coach_notes').select('notes, updated_at').eq('user_id', userId).maybeSingle();
+  if (error || !data) return null;
+  const row = data as { notes: string; updated_at: string };
+  return row.notes.trim() ? { notes: row.notes.trim(), updatedAt: new Date(row.updated_at).getTime() } : null;
+}
+
+export async function clearNotes(userId: string): Promise<boolean> {
+  if (!supabase) return true;
+  const { error } = await supabase.from('coach_notes').delete().eq('user_id', userId);
+  return !error;
+}

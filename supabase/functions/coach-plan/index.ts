@@ -72,6 +72,7 @@ Scale this down for everyone else: same structure and formats, lighter numbers, 
 - intermediate: pull ups, dips, push ups, muscle up progressions or a few muscle ups if they have them, some weighted work if they have weights.
 - advanced: Uzi's week is the reference.
 - Recent logs: if they did every round at the target, go a little higher; if they skipped blocks or did fewer reps, keep or lower. Respect what they actually did over what they answered.
+- coachNotes in the athlete data are the coach's own notes on this athlete, built from their workouts and their chat with the coach: how they train and respond, pain to look after, goals and dates, their schedule and what to follow up on. Use them; they matter as much as the numbers.
 - Block feedback in the logs (optional, the athlete fills it in during the rest): feel is easy, good, hard or max (all out); paused means they had to stop the clock; note is their own words. Easy with every round done: go up. Hard, max or paused: keep the load or lower it, add rest, or split the reps. Take the notes seriously (pain, fatigue, technique trouble) and say in the summary when they changed something.
 
 ## Equipment and safety
@@ -339,6 +340,8 @@ type Stored = ReturnType<typeof athleteInput> & {
   revisions?: { plan: unknown; note: string; at: string }[];
   /** The athlete asked for this change to their current plan (previousPlan) in the coach chat. */
   change?: { note: string; at: string };
+  /** The coach's notes on the athlete (table coach_notes) when the plan was asked for. */
+  coachNotes?: string;
 };
 
 /** The part of the stored input Claude reads about the athlete. */
@@ -416,6 +419,8 @@ Deno.serve(async (req) => {
   }
 
   const { data: row } = await db.from('user_data').select('data').eq('user_id', user.id).maybeSingle();
+  const { data: notesRow } = await db.from('coach_notes').select('notes').eq('user_id', user.id).maybeSingle();
+  const coachNotes = typeof notesRow?.notes === 'string' && notesRow.notes.trim() ? notesRow.notes.trim().slice(0, 8000) : undefined;
   const { data: lastApproved } = await db.from('coach_plans').select('weeks, start_date, plan, approved_plan').eq('user_id', user.id).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
   const lastPlan = lastApproved ? { weeks: lastApproved.weeks, startDate: lastApproved.start_date, ...(lastApproved.approved_plan ?? lastApproved.plan) } : null;
   if (change !== null && !lastApproved) return json({ error: 'noplan' }, 400);
@@ -430,6 +435,7 @@ Deno.serve(async (req) => {
   const input: Stored = {
     ...athleteInput(profile, (row?.data ?? {}) as Synced, lastPlan, weeks, today, startDate, language),
     athlete: { name },
+    ...(coachNotes ? { coachNotes } : {}),
     trainingDays,
     exercises,
     ...(change !== null ? { change: { note: change, at: new Date().toISOString() } } : {}),

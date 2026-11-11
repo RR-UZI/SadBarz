@@ -5,7 +5,21 @@ import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react
 
 import { Button, Card, Row, Screen, Txt, styles as ui } from '../components/ui';
 import { useT } from '../i18n';
-import { type ChatError, type ChatMessage, cachedChat, clearChat, loadChat, MAX_MESSAGE, type ProposalError, sendProposal, sendToCoach } from '../lib/coachChat';
+import {
+  type ChatError,
+  type ChatMessage,
+  type CoachNotes,
+  cachedChat,
+  checkIn,
+  clearChat,
+  clearNotes,
+  loadChat,
+  loadNotes,
+  MAX_MESSAGE,
+  type ProposalError,
+  sendProposal,
+  sendToCoach,
+} from '../lib/coachChat';
 import { confirm } from '../lib/confirm';
 import { showPro } from '../lib/plan';
 import { useNav } from '../navigation';
@@ -34,12 +48,25 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<ChatError | null>(null);
   const [left, setLeft] = useState<number | null>(null);
+  // The coach catching up with workouts it hasn't seen (shown as "looking at your training" after a moment).
+  const [catchingUp, setCatchingUp] = useState(false);
   const scroll = useRef<React.ComponentRef<typeof ScrollView>>(null);
+  const nav = useNav();
 
   useEffect(() => {
     let live = true;
     cachedChat(userId).then((c) => live && setMessages((m) => m ?? c));
-    loadChat(userId).then((l) => live && l && setMessages(l));
+    (async () => {
+      const loaded = await loadChat(userId);
+      if (!live) return;
+      if (loaded) setMessages(loaded);
+      const slow = setTimeout(() => live && setCatchingUp(true), 700);
+      const note = await checkIn(userId, loaded ?? (await cachedChat(userId)), settings.language);
+      clearTimeout(slow);
+      if (!live) return;
+      setCatchingUp(false);
+      if (note) setMessages((m) => (m?.some((x) => x.id === note.id) ? m : [...(m ?? []), note]));
+    })();
     return () => {
       live = false;
     };
@@ -48,7 +75,7 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
   const toEnd = useCallback(() => {
     setTimeout(() => scroll.current?.scrollToEnd({ animated: true }), 50);
   }, []);
-  useEffect(toEnd, [messages?.length, sending, toEnd]);
+  useEffect(toEnd, [messages?.length, sending, catchingUp, toEnd]);
 
   const send = async (raw: string) => {
     const text = raw.trim().slice(0, MAX_MESSAGE);
@@ -126,6 +153,18 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
       }
     >
       <ScrollView ref={scroll} contentContainerStyle={{ padding: space.lg, gap: space.sm }} keyboardShouldPersistTaps="handled">
+        <Pressable
+          onPress={() => nav.push({ name: 'coachNotes' })}
+          accessibilityRole="button"
+          style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: space.sm, paddingHorizontal: space.md, marginBottom: space.xs }}
+        >
+          <Txt variant="small" color={colors.muted} style={{ flex: 1 }}>
+            {t('coachNotes.link')}
+          </Txt>
+          <Txt variant="small" color={colors.accent} style={{ fontWeight: '700' }}>
+            {t('coachNotes.open')}
+          </Txt>
+        </Pressable>
         <Bubble role="assistant" text={t('coachChat.hello', { name: name.split(' ')[0] })} />
         {messages === null ? <ActivityIndicator color={colors.accent} style={{ marginTop: space.lg }} /> : null}
         {list.map((m) => (
@@ -141,12 +180,12 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
             ) : null}
           </View>
         ))}
-        {sending ? (
+        {sending || catchingUp ? (
           <Txt variant="small" color={colors.muted} style={{ marginLeft: space.xs }}>
-            {t('coachChat.typing')}
+            {t(sending ? 'coachChat.typing' : 'coachChat.catchingUp')}
           </Txt>
         ) : null}
-        {messages !== null && !list.length && !sending ? (
+        {messages !== null && !list.length && !sending && !catchingUp ? (
           <View style={{ gap: space.sm, marginTop: space.md }}>
             <Txt variant="label">{t('coachChat.tryTitle')}</Txt>
             {SUGGESTIONS.map((k) => (
@@ -221,6 +260,78 @@ function ProposalCard({ message, sending, error, onSend }: { message: ChatMessag
         </>
       )}
     </Card>
+  );
+}
+
+// What the coach has learned about the athlete: read-only, and the athlete can delete it.
+export function CoachNotesScreen() {
+  const t = useT();
+  const nav = useNav();
+  const { user } = useAuth();
+  const { settings } = useApp();
+  const [notes, setNotes] = useState<CoachNotes | null | undefined>(undefined);
+  const [problem, setProblem] = useState(false);
+  const userId = user?.id;
+  useEffect(() => {
+    if (!userId) return;
+    let live = true;
+    loadNotes(userId)
+      .then((n) => live && setNotes(n))
+      .catch(() => live && setNotes(null));
+    return () => {
+      live = false;
+    };
+  }, [userId]);
+  const remove = () =>
+    confirm(
+      t('coachNotes.clearAsk'),
+      () => {
+        if (!userId) return;
+        clearNotes(userId).then((ok) => (ok ? setNotes(null) : setProblem(true)));
+      },
+      t('coachNotes.clear'),
+      t('common.cancel'),
+    );
+  const when = notes ? new Date(notes.updatedAt).toLocaleDateString(settings.language === 'en' ? 'en-US' : 'es-MX', { day: 'numeric', month: 'long' }) : '';
+  return (
+    <Screen title={t('coachNotes.title')} onBack={nav.pop}>
+      <Txt color={colors.muted}>{t('coachNotes.intro')}</Txt>
+      {notes === undefined ? <ActivityIndicator color={colors.accent} style={{ marginTop: space.lg }} /> : null}
+      {notes === null ? (
+        <Card style={{ marginTop: space.md }}>
+          <Txt color={colors.muted}>{t('coachNotes.empty')}</Txt>
+        </Card>
+      ) : null}
+      {notes ? (
+        <>
+          <Card style={{ marginTop: space.md, gap: space.sm }}>
+            {notes.notes.split('\n').map((line, i) =>
+              /^[^-•].*:$/.test(line.trim()) ? (
+                <Txt key={i} variant="label" color={colors.accent} style={{ marginTop: i ? space.sm : 0 }}>
+                  {line.trim().slice(0, -1)}
+                </Txt>
+              ) : line.trim() ? (
+                <Txt key={i}>{line.trim()}</Txt>
+              ) : null,
+            )}
+            <Txt variant="tiny" color={colors.muted}>
+              {t('coachNotes.updated', { d: when })}
+            </Txt>
+          </Card>
+          <Txt variant="small" color={colors.muted} style={{ marginTop: space.md }}>
+            {t('coachNotes.fix')}
+          </Txt>
+          {problem ? (
+            <Txt variant="small" color={colors.danger} style={{ marginTop: space.sm }}>
+              {t('coachNotes.clearError')}
+            </Txt>
+          ) : null}
+          <View style={{ marginTop: space.md, alignItems: 'flex-start' }}>
+            <Button label={t('coachNotes.clear')} variant="ghost" size="sm" onPress={remove} />
+          </View>
+        </>
+      ) : null}
+    </Screen>
   );
 }
 
