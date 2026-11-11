@@ -39,3 +39,9 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. Docs: https://docs.expo.dev/versions/latest/index.md
+
+## Product direction: the AI coach
+
+The end goal is a coach that runs on its own. It writes and adjusts each athlete's plan by itself, uses everything the app knows about that athlete (profile, workout history, check-ins, chat) to get better, and learns about each athlete separately so its advice is specific to that person.
+
+Uzi's manual review of plans and plan changes is only there while the coach is being tested. Build coach features so that this review step can later be switched off, for example with a setting, without rewriting the feature.
