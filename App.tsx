@@ -19,7 +19,7 @@ import { RoutineDetailScreen } from './src/screens/RoutineDetailScreen';
 import { RoutineEditorScreen } from './src/screens/RoutineEditorScreen';
 import { RoutinesScreen } from './src/screens/RoutinesScreen';
 import { CoachPlanScreen, CoachReviewScreen } from './src/screens/CoachReviewScreen';
-import { CoachScreen } from './src/screens/CoachScreen';
+import { CoachNotesScreen, CoachScreen } from './src/screens/CoachScreen';
 import { MyPlanScreen } from './src/screens/MyPlanScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { QuickTimerScreen, StopwatchScreen, TimersScreen } from './src/screens/TimersScreen';
@@ -151,6 +151,8 @@ function renderRoute(r: Route) {
       return <CoachPlanScreen id={r.id} />;
     case 'myPlan':
       return <MyPlanScreen />;
+    case 'coachNotes':
+      return <CoachNotesScreen />;
     case 'adminUsers':
       return <AdminUsersScreen />;
     case 'exerciseReview':
