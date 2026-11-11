@@ -5,9 +5,10 @@ import { ActivityIndicator, Pressable, ScrollView, TextInput, View } from 'react
 
 import { Button, Card, Row, Screen, Txt, styles as ui } from '../components/ui';
 import { useT } from '../i18n';
-import { type ChatError, type ChatMessage, cachedChat, clearChat, loadChat, MAX_MESSAGE, sendToCoach } from '../lib/coachChat';
+import { type ChatError, type ChatMessage, cachedChat, clearChat, loadChat, MAX_MESSAGE, type ProposalError, sendProposal, sendToCoach } from '../lib/coachChat';
 import { confirm } from '../lib/confirm';
 import { showPro } from '../lib/plan';
+import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, radius, space } from '../theme';
@@ -24,8 +25,11 @@ export function CoachScreen() {
 
 function CoachChat({ userId, name }: { userId: string; name: string }) {
   const t = useT();
-  const { settings } = useApp();
+  const { settings, exercises } = useApp();
   const [messages, setMessages] = useState<ChatMessage[] | null>(null);
+  // A proposal being sent, and why the last one couldn't be (by message id).
+  const [proposing, setProposing] = useState<string | null>(null);
+  const [proposalError, setProposalError] = useState<{ id: string; error: ProposalError } | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [problem, setProblem] = useState<ChatError | null>(null);
@@ -66,6 +70,16 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
       setDraft(text);
       setProblem(res.error);
     }
+  };
+
+  const propose = async (m: ChatMessage) => {
+    if (proposing || !messages) return;
+    setProposing(m.id);
+    setProposalError(null);
+    const res = await sendProposal(userId, messages, m, exercises, settings.language);
+    setProposing(null);
+    if (res.ok) setMessages(res.messages);
+    else setProposalError({ id: m.id, error: res.error });
   };
 
   const clear = () =>
@@ -115,7 +129,17 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
         <Bubble role="assistant" text={t('coachChat.hello', { name: name.split(' ')[0] })} />
         {messages === null ? <ActivityIndicator color={colors.accent} style={{ marginTop: space.lg }} /> : null}
         {list.map((m) => (
-          <Bubble key={m.id} role={m.role} text={m.content} />
+          <View key={m.id} style={{ gap: space.sm }}>
+            <Bubble role={m.role} text={m.content} />
+            {m.role === 'assistant' && m.proposal ? (
+              <ProposalCard
+                message={m}
+                sending={proposing === m.id}
+                error={proposalError?.id === m.id ? proposalError.error : null}
+                onSend={() => propose(m)}
+              />
+            ) : null}
+          </View>
         ))}
         {sending ? (
           <Txt variant="small" color={colors.muted} style={{ marginLeft: space.xs }}>
@@ -158,6 +182,45 @@ function Bubble({ role, text }: { role: 'user' | 'assistant'; text: string }) {
     >
       <Txt color={me ? colors.accentText : colors.text}>{text}</Txt>
     </View>
+  );
+}
+
+// A change to the plan the coach proposed: the athlete sends it, the coach rewrites the plan and Uzi reviews it.
+function ProposalCard({ message, sending, error, onSend }: { message: ChatMessage; sending: boolean; error: ProposalError | null; onSend: () => void }) {
+  const t = useT();
+  const nav = useNav();
+  const p = message.proposal!;
+  return (
+    <Card style={{ alignSelf: 'flex-start', maxWidth: '85%', borderColor: colors.accent, gap: space.sm }}>
+      <Txt variant="label" color={colors.accent}>
+        {t('coachChat.proposalTitle')}
+      </Txt>
+      <Txt style={{ fontWeight: '700' }}>{p.summary}</Txt>
+      {p.planId ? (
+        <>
+          <Txt variant="small" color={colors.success}>
+            ✓ {t('coachChat.proposalSent')}
+          </Txt>
+          <Pressable onPress={() => nav.push({ name: 'myPlan' })} hitSlop={6} accessibilityRole="button">
+            <Txt variant="small" color={colors.accent} style={{ fontWeight: '700' }}>
+              {t('coachChat.proposalMyPlan')}
+            </Txt>
+          </Pressable>
+        </>
+      ) : (
+        <>
+          <Txt variant="small" color={colors.muted}>
+            {t('coachChat.proposalHint')}
+          </Txt>
+          {error ? (
+            <Txt variant="small" color={error === 'busy' ? colors.warn : colors.danger}>
+              {t(`coachChat.proposalError.${error}`)}
+            </Txt>
+          ) : null}
+          <Button label={sending ? t('coachChat.proposalSending') : t('coachChat.proposalSend')} size="sm" disabled={sending} onPress={onSend} />
+        </>
+      )}
+    </Card>
   );
 }
 

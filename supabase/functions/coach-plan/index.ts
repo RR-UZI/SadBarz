@@ -8,6 +8,10 @@
 //   -> 200 { id, status }             a plan is already being written or reviewed, nothing new started
 // POST { rewrite: planId, note, exercises } (admins only): Uzi sends a plan back with a note;
 //   the coach writes it again following the note -> 202 { id, status: 'writing' }
+// POST { change, messageId?, today, language, exercises }: the athlete sends a plan change the chat coach proposed
+//   (coach-chat). The coach writes a new version of their current plan with that change, same length and start,
+//   for Uzi's review -> 202 { id, status: 'writing' }; 409 { error: 'busy' } while another plan waits for review,
+//   400 { error: 'noplan' } with no approved plan
 //
 // Secrets: ANTHROPIC_API_KEY (added by Uzi in Supabase > Edge Functions > Secrets).
 // SUPABASE_URL and the server key (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS) are provided by Supabase itself.
@@ -333,11 +337,13 @@ type Stored = ReturnType<typeof athleteInput> & {
   exercises?: Exercise[];
   /** Earlier versions Uzi sent back, oldest first. */
   revisions?: { plan: unknown; note: string; at: string }[];
+  /** The athlete asked for this change to their current plan (previousPlan) in the coach chat. */
+  change?: { note: string; at: string };
 };
 
 /** The part of the stored input Claude reads about the athlete. */
 function aboutAthlete(input: Stored) {
-  const { athlete: _a, trainingDays: _t, exercises: _e, revisions: _r, ...rest } = input;
+  const { athlete: _a, trainingDays: _t, exercises: _e, revisions: _r, change: _c, ...rest } = input;
   return rest;
 }
 
@@ -383,8 +389,11 @@ Deno.serve(async (req) => {
     if (!isAdmin) return json({ error: 'admin' }, 403);
     return rewrite(body.rewrite, String(body.note ?? '').trim().slice(0, 2000), cleanExercises(body.exercises), user.id);
   }
-  const weeks = Number(body.weeks);
-  if (!PLAN_LENGTHS.includes(weeks)) return json({ error: 'weeks' }, 400);
+  // A change from the coach chat rewrites the current plan; otherwise it's a new plan of the length asked.
+  const change = typeof body.change === 'string' ? body.change.trim().slice(0, 1500) : null;
+  if (change === '') return json({ error: 'change' }, 400);
+  const asked = Number(body.weeks);
+  if (change === null && !PLAN_LENGTHS.includes(asked)) return json({ error: 'weeks' }, 400);
   const today = /^\d{4}-\d{2}-\d{2}$/.test(body.today) ? body.today : day(Date.now());
   const language = body.language === 'en' ? 'en' : 'es';
   const exercises = cleanExercises(body.exercises);
@@ -398,7 +407,7 @@ Deno.serve(async (req) => {
   const { data: latest } = await db.from('coach_plans').select('id, status, updated_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (latest && ['writing', 'review', 'returned'].includes(latest.status)) {
     const stuck = latest.status === 'writing' && Date.now() - new Date(latest.updated_at).getTime() > STUCK_AFTER_MS;
-    if (!stuck) return json({ id: latest.id, status: latest.status });
+    if (!stuck) return change === null ? json({ id: latest.id, status: latest.status }) : json({ error: 'busy', id: latest.id, status: latest.status }, 409);
     await db.from('coach_plans').update({ status: 'failed', error: 'timed out', updated_at: new Date().toISOString() }).eq('id', latest.id);
   }
   if (!isAdmin) {
@@ -409,7 +418,12 @@ Deno.serve(async (req) => {
   const { data: row } = await db.from('user_data').select('data').eq('user_id', user.id).maybeSingle();
   const { data: lastApproved } = await db.from('coach_plans').select('weeks, start_date, plan, approved_plan').eq('user_id', user.id).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
   const lastPlan = lastApproved ? { weeks: lastApproved.weeks, startDate: lastApproved.start_date, ...(lastApproved.approved_plan ?? lastApproved.plan) } : null;
-  const startDate = typeof profile.startDate === 'string' && profile.startDate > today ? profile.startDate : today;
+  if (change !== null && !lastApproved) return json({ error: 'noplan' }, 400);
+  const weeks = change !== null ? Number(lastApproved!.weeks) : asked;
+  // A changed plan keeps its dates while it's still running (the weeks go on counting); an ended one starts again today.
+  const running = (start: string | null) => !!start && Date.parse(start) + weeks * 7 * 86_400_000 > Date.parse(today);
+  const startDate =
+    change !== null && running(lastApproved!.start_date) ? String(lastApproved!.start_date) : typeof profile.startDate === 'string' && profile.startDate > today ? profile.startDate : today;
   // Email sign up stores `name`; Google fills `full_name` (and usually `name`).
   const metaName = [user.user_metadata?.name, user.user_metadata?.full_name].find((v): v is string => typeof v === 'string' && v.trim() !== '');
   const name = metaName ? metaName.trim().slice(0, 80) : undefined;
@@ -418,6 +432,7 @@ Deno.serve(async (req) => {
     athlete: { name },
     trainingDays,
     exercises,
+    ...(change !== null ? { change: { note: change, at: new Date().toISOString() } } : {}),
   };
 
   const { data: created, error: insertError } = await db
@@ -426,6 +441,19 @@ Deno.serve(async (req) => {
     .select('id')
     .single();
   if (insertError || !created) return json({ error: 'save', detail: insertError?.message }, 500);
+
+  // Mark the chat proposal as sent, so the chat shows it (and the coach knows) from now on.
+  const messageId = Number(body.messageId);
+  if (change !== null && Number.isInteger(messageId) && messageId > 0) {
+    const { data: msg } = await db.from('coach_messages').select('proposal').eq('id', messageId).eq('user_id', user.id).maybeSingle();
+    if (msg?.proposal) {
+      await db
+        .from('coach_messages')
+        .update({ proposal: { ...msg.proposal, planId: created.id, sentAt: new Date().toISOString() } })
+        .eq('id', messageId)
+        .eq('user_id', user.id);
+    }
+  }
 
   // Writing takes a minute or two; the app checks back with my_coach_plan_status().
   EdgeRuntime.waitUntil(writePlan(created.id, input, trainingDays, exercises));
@@ -484,6 +512,14 @@ async function writePlan(planId: string, input: Stored, trainingDays: number[], 
               { type: 'text', text: `The athlete:\n${JSON.stringify(aboutAthlete(input))}` },
               ...(notes.length
                 ? [{ type: 'text' as const, text: `Uzi's recent corrections on plans you wrote (for any athlete). Keep following them where they apply:\n${notes.map((n) => `- ${n}`).join('\n')}` }]
+                : []),
+              ...(input.change
+                ? [
+                    {
+                      type: 'text' as const,
+                      text: `The athlete asked to change their current plan (previousPlan in the athlete data) in the coach chat. The change, as the chat coach agreed it with them:\n"${input.change.note}"\n\nWrite the new version of that plan: make this change and keep everything else as it is, unless the change needs more. Start the summary (for Uzi) with what the athlete asked for, then what you changed.`,
+                    },
+                  ]
                 : []),
               ...(last
                 ? [

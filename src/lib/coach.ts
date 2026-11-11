@@ -92,6 +92,8 @@ export interface PlanInput {
   recentWorkouts?: unknown[];
   exercises?: Exercise[];
   revisions?: { note: string; at: string }[];
+  /** The athlete asked for this change to their current plan in the coach chat. */
+  change?: { note: string; at: string };
 }
 
 export interface ReviewItem {

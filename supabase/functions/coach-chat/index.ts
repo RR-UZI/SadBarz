@@ -4,7 +4,9 @@
 // so off-topic questions cost almost nothing.
 //
 // POST { message: string, language?: 'es' | 'en' } with the athlete's session (supabase.functions.invoke sends it)
-//   -> 200 { reply, left }   the coach's answer; both messages are saved in coach_messages; left = messages left today
+//   -> 200 { reply, left, id, proposal }   the coach's answer; both messages are saved in coach_messages;
+//      left = messages left today; id = the answer's row; proposal = { summary, change } when the coach proposes a
+//      change to the athlete's plan (the app shows it with a button that sends it to coach-plan, for Uzi's review)
 //   -> 400 { error: 'empty' | 'long' }, 401 auth, 403 pro, 429 limit, 500 failed
 //
 // Secrets: ANTHROPIC_API_KEY (the same one coach-plan uses).
@@ -42,10 +44,29 @@ Anything else (homework, code, news, politics, money, relationships not about th
 - Short: usually 2 to 6 sentences, or a short list. At most about 150 words unless they ask for detail. No headings. Plain text; short "-" lists are fine.
 - Use what you know about the athlete below: their level, goal, equipment, injuries, recent workouts and the feedback they left on blocks (feel: easy, good, hard, max; paused; their notes), records and plan. Refer to specific workouts and numbers when it helps.
 - Give concrete advice: sets, reps, seconds, rest, which progression or regression, a cue to fix technique. Respect their equipment and injuries.
-- If they want to change their plan: say what you would change and why. They can edit a block themselves with ✎ Editar in the routine, or ask for a new plan from Inicio (Uzi reviews every plan).
+- If they want to change their plan: talk it through and say what you would change and why. When they have a plan from Uzi and you both agree on the change, call propose_plan_change: the app shows it under your answer with a button, they send it, the coach rewrites the plan and Uzi reviews it before it shows in their Mi plan. Only propose what they asked for or agreed to, one proposal per answer, and also say it in your text in a sentence. Small one-off tweaks they can do themselves with ✎ Editar in the routine. With no plan yet, they ask for one from Inicio.
 - Pain or injury: general, conservative advice (stop what hurts, easier variations, rest), and tell them to see a doctor or physiotherapist if it is sharp, keeps coming back or doesn't get better. Never diagnose.
 - Mental health: be supportive and practical. If they talk about feeling hopeless, hurting themselves or not wanting to live, put that first: respond with care, encourage them to talk to someone they trust and to a professional, and give a crisis line (in Mexico: Línea de la Vida 800 911 2000; elsewhere: their local emergency number). Don't go back to training in that answer.
 - Don't make up data you don't have. If something isn't in what you know about them, ask.`;
+
+// The tool the coach uses to propose a plan change (only offered when the athlete has a plan).
+const PROPOSE = {
+  name: 'propose_plan_change',
+  description:
+    "Propose a change to the athlete's current plan from Uzi. Use it only when the athlete asked for the change, or agreed to one you suggested, and it is clear what to change. The app shows it under your answer with a button; the athlete sends it, the plan is rewritten with the change and Uzi reviews it before it reaches them.",
+  input_schema: {
+    type: 'object' as const,
+    properties: {
+      summary: { type: 'string', description: 'One short line for the athlete, in their language: what changes. E.g. "Lunes con menos muscle ups y 3 min de descanso entre bloques".' },
+      change: {
+        type: 'string',
+        description: 'For whoever rewrites the plan, in Spanish: exactly what to change and why (which days, blocks, exercises, numbers, rest), and that everything else stays the same.',
+      },
+    },
+    required: ['summary', 'change'],
+    additionalProperties: false,
+  },
+};
 
 // ---------- What the coach knows about the athlete ----------
 
@@ -77,6 +98,8 @@ interface PlanDay {
   routine?: { name?: string; blocks?: { title?: string; format?: string }[] };
   blocks?: { title?: string; format?: string }[];
 }
+
+type Proposal = { summary: string; change: string; planId?: string; sentAt?: string };
 
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -169,7 +192,7 @@ Deno.serve(async (req) => {
 
   // What the coach reads: the last messages, and the athlete.
   const [{ data: past }, { data: row }, { data: lastPlan }] = await Promise.all([
-    db.from('coach_messages').select('role, content').eq('user_id', user.id).order('created_at', { ascending: false }).limit(HISTORY),
+    db.from('coach_messages').select('role, content, proposal').eq('user_id', user.id).order('created_at', { ascending: false }).limit(HISTORY),
     db.from('user_data').select('data').eq('user_id', user.id).maybeSingle(),
     db.from('coach_plans').select('plan, approved_plan').eq('user_id', user.id).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle(),
   ]);
@@ -180,17 +203,21 @@ Deno.serve(async (req) => {
 
   // Oldest first, starting with the athlete, one turn each (two in a row are joined).
   const turns: { role: 'user' | 'assistant'; content: string }[] = [];
-  for (const m of [...((past ?? []) as { role: 'user' | 'assistant'; content: string }[])].reverse()) {
+  for (const m of [...((past ?? []) as { role: 'user' | 'assistant'; content: string; proposal: Proposal | null }[])].reverse()) {
     if (!turns.length && m.role !== 'user') continue;
+    // A proposal shows in the history as a note, so the coach knows it already made it (and if it was sent).
+    const content = m.proposal ? `${m.content}\n\n[Plan change proposed: ${m.proposal.summary}${m.proposal.planId ? ' (the athlete sent it to Uzi)' : ''}]` : m.content;
     const prev = turns[turns.length - 1];
-    if (prev && prev.role === m.role) prev.content += `\n\n${m.content}`;
-    else turns.push({ ...m });
+    if (prev && prev.role === m.role) prev.content += `\n\n${content}`;
+    else turns.push({ role: m.role, content });
   }
   if (turns.length && turns[turns.length - 1].role === 'user') turns[turns.length - 1].content += `\n\n${message}`;
   else turns.push({ role: 'user', content: message });
 
   let reply: string;
+  let proposal: Proposal | null = null;
   let usage: Record<string, unknown> = {};
+  const hasPlan = !!plan?.days?.length;
   try {
     const claude = new Anthropic(); // reads ANTHROPIC_API_KEY
     const answer = await claude.beta.messages.create({
@@ -205,6 +232,7 @@ Deno.serve(async (req) => {
         { type: 'text', text: `## What you know about this athlete\n${context}` },
       ],
       messages: turns,
+      ...(hasPlan ? { tools: [PROPOSE] } : {}),
     });
     usage = { model: answer.model, ...answer.usage };
     const text = answer.content
@@ -212,9 +240,13 @@ Deno.serve(async (req) => {
       .map((b) => (b as { text: string }).text)
       .join('\n')
       .trim();
-    if (answer.stop_reason === 'refusal' || !text) {
+    const call = answer.content.find((b) => b.type === 'tool_use' && b.name === PROPOSE.name) as { input?: { summary?: unknown; change?: unknown } } | undefined;
+    const summary = String(call?.input?.summary ?? '').trim().slice(0, 200);
+    const change = String(call?.input?.change ?? '').trim().slice(0, 1500);
+    if (hasPlan && summary && change) proposal = { summary, change };
+    if (answer.stop_reason === 'refusal' || (!text && !proposal)) {
       reply = body.language === 'en' ? "I can't help with that one. Ask me anything about your training." : 'Con eso no te puedo ayudar. Pregúntame lo que quieras de tu entrenamiento.';
-    } else reply = text;
+    } else reply = text || (body.language === 'en' ? 'Here is the change I propose for your plan:' : 'Este es el cambio que te propongo para tu plan:');
   } catch (e) {
     console.error('coach-chat', user.id, e);
     return json({ error: 'failed', detail: String(e instanceof Error ? e.message : e).slice(0, 300) }, 500);
@@ -222,10 +254,14 @@ Deno.serve(async (req) => {
 
   // Saved together, so a failed answer doesn't leave a question without its reply.
   const now = Date.now();
-  const { error: saveError } = await db.from('coach_messages').insert([
-    { user_id: user.id, role: 'user', content: message, created_at: new Date(now).toISOString() },
-    { user_id: user.id, role: 'assistant', content: reply, usage, created_at: new Date(now + 1).toISOString() },
-  ]);
+  const { data: saved, error: saveError } = await db
+    .from('coach_messages')
+    .insert([
+      { user_id: user.id, role: 'user', content: message, created_at: new Date(now).toISOString() },
+      { user_id: user.id, role: 'assistant', content: reply, usage, proposal, created_at: new Date(now + 1).toISOString() },
+    ])
+    .select('id, role');
   if (saveError) console.error('coach-chat save', user.id, saveError.message);
-  return json({ reply, left });
+  const id = (saved as { id: number; role: string }[] | null)?.find((r) => r.role === 'assistant')?.id ?? null;
+  return json({ reply, left, id, proposal });
 });
