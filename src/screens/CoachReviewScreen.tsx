@@ -309,6 +309,14 @@ export function CoachPlanScreen({ id }: { id: string }) {
           {t('review.failedNote', { e: plan.error ?? '' })}
         </Txt>
       ) : null}
+      {plan.input.change ? (
+        <Card style={{ marginTop: space.md, borderColor: colors.accent }}>
+          <Txt variant="label" color={colors.accent}>
+            {t('review.chatChange')}
+          </Txt>
+          <Txt style={{ marginTop: 4 }}>{plan.input.change.note}</Txt>
+        </Card>
+      ) : null}
       {plan.reviewNote ? (
         <Card style={{ marginTop: space.md }}>
           <Txt variant="label" color={colors.muted}>
