@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
 
 import { RedeemCard, useCodeRoutineUpdates } from '../components/PlanCode';
@@ -10,7 +10,8 @@ import { clock } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
 import { colors, space } from '../theme';
-import type { Block } from '../types';
+import type { Block, Routine } from '../types';
+import { usePlanRoutines } from './MyPlanScreen';
 
 export function RoutinesScreen() {
   useCodeRoutineUpdates();
@@ -20,6 +21,12 @@ export function RoutinesScreen() {
   const limit = useRoutineLimit();
   // Free accounts at their limit get the Pro pop-up instead of a new routine.
   const newRoutine = () => (limit.canAdd ? nav.push({ name: 'editRoutine' }) : showPro('routineLimit'));
+  // With a real plan (coach plan or plan code) the plan goes first and the examples fold away at the bottom.
+  const plan = usePlanRoutines();
+  const [showExamples, setShowExamples] = useState(false);
+  const coachDays = plan.filter((p) => p.coach);
+  const examples = plan.length ? routines.filter((r) => r.example) : [];
+  const listed = plan.length ? routines.filter((r) => !r.example) : routines;
 
   return (
     <Screen title={t('routines.title')} mark right={<Button label="+" size="sm" onPress={newRoutine} />}>
@@ -33,31 +40,59 @@ export function RoutinesScreen() {
         </Pressable>
       ) : null}
       <RedeemCard />
+      {coachDays.length ? (
+        <View style={{ gap: space.md, marginTop: space.lg }}>
+          <Txt variant="label">{t('myPlan.title')}</Txt>
+          {coachDays.map((p) => (
+            <RoutineCard key={p.routine.id} routine={p.routine} name={p.name} highlight onPress={() => nav.push({ name: 'myPlan' })} />
+          ))}
+        </View>
+      ) : null}
       <View style={{ gap: space.md, marginTop: space.lg }}>
-        {routines.length === 0 ? <Txt color={colors.muted}>{t('routines.empty')}</Txt> : null}
-        {routines.map((r) => (
-          <Card key={r.id} onPress={() => nav.push({ name: 'routine', id: r.id })}>
-            <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <View style={{ flex: 1, gap: 4 }}>
-                <Txt style={{ fontWeight: '800', fontSize: 17 }}>{r.name}</Txt>
-                <Txt variant="small" color={colors.muted}>
-                  {r.blocks.length} {t('routines.blocks')}
-                </Txt>
-              </View>
-              {r.example ? <Badge label={t('common.example')} /> : null}
-            </Row>
-            <View style={{ marginTop: space.sm, gap: 2 }}>
-              {r.blocks.slice(0, 4).map((b) => (
-                <Txt key={b.id} variant="small" color={colors.muted} numberOfLines={1}>
-                  • {b.title ? `${b.title}: ` : ''}
-                  {formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))}
-                </Txt>
-              ))}
-            </View>
-          </Card>
+        {listed.length === 0 && !coachDays.length ? <Txt color={colors.muted}>{t('routines.empty')}</Txt> : null}
+        {listed.map((r) => (
+          <RoutineCard key={r.id} routine={r} onPress={() => nav.push({ name: 'routine', id: r.id })} />
         ))}
       </View>
+      {examples.length ? (
+        <View style={{ gap: space.md, marginTop: space.xl }}>
+          <Pressable accessibilityRole="button" onPress={() => setShowExamples((v) => !v)} hitSlop={8}>
+            <Row style={{ justifyContent: 'space-between' }}>
+              <Txt variant="label">{t('routines.examples', { n: examples.length })}</Txt>
+              <Txt color={colors.accent} style={{ fontWeight: '700' }}>
+                {showExamples ? t('routines.hideExamples') : t('routines.showExamples')}
+              </Txt>
+            </Row>
+          </Pressable>
+          {showExamples ? examples.map((r) => <RoutineCard key={r.id} routine={r} onPress={() => nav.push({ name: 'routine', id: r.id })} />) : null}
+        </View>
+      ) : null}
     </Screen>
+  );
+}
+
+function RoutineCard({ routine: r, name, highlight, onPress }: { routine: Routine; name?: string; highlight?: boolean; onPress: () => void }) {
+  const t = useT();
+  return (
+    <Card onPress={onPress} style={highlight ? { borderColor: colors.accent } : undefined}>
+      <Row style={{ justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <View style={{ flex: 1, gap: 4 }}>
+          <Txt style={{ fontWeight: '800', fontSize: 17 }}>{name ?? r.name}</Txt>
+          <Txt variant="small" color={colors.muted}>
+            {r.blocks.length} {t('routines.blocks')}
+          </Txt>
+        </View>
+        {r.example ? <Badge label={t('common.example')} /> : null}
+      </Row>
+      <View style={{ marginTop: space.sm, gap: 2 }}>
+        {r.blocks.slice(0, 4).map((b) => (
+          <Txt key={b.id} variant="small" color={colors.muted} numberOfLines={1}>
+            • {b.title ? `${b.title}: ` : ''}
+            {formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))}
+          </Txt>
+        ))}
+      </View>
+    </Card>
   );
 }
 
