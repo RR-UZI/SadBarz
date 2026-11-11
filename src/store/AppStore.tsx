@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { SEED_EXERCISES, seedRoutines } from '../data/seed';
+import { exampleMonday, isOldExample, SEED_EXERCISES, seedRoutines } from '../data/seed';
 import { useExercisePool } from '../lib/exercisePool';
 import { setVolume } from '../lib/sound';
 import { mergeSynced, pullRemote, pushRemote, syncEnabled, syncedKey, type Synced } from '../lib/sync';
@@ -77,11 +77,14 @@ function initialData(settings: Settings = DEFAULT_SETTINGS): Data {
   return { exercises: SEED_EXERCISES, routines: seedRoutines(), workouts: [], settings, settingsAt: 0, deleted: {}, avatar: null, avatarAt: 0, records: [] };
 }
 
-// Swaps the old examples for the current ones. Examples the user edited are kept.
-function withNewExamples(routines: Routine[]) {
-  const kept = routines.filter((r) => !r.example || r.updatedAt !== r.createdAt);
-  const seeds = seedRoutines().filter((s) => !kept.some((r) => r.id === s.id));
-  return [...kept.filter((r) => !r.example), ...seeds, ...kept.filter((r) => r.example)];
+// The examples change every Monday: untouched ones from an earlier week (or the old weekday examples)
+// give way to this week's. Examples the user edited are theirs and stay; ones they deleted don't come back.
+function withThisWeeksExamples(d: Data): Data {
+  const monday = exampleMonday();
+  const kept = d.routines.filter((r) => !isOldExample(r, monday));
+  const missing = seedRoutines().filter((s) => !kept.some((r) => r.id === s.id) && !(s.id in d.deleted));
+  if (kept.length === d.routines.length && !missing.length) return d;
+  return { ...d, routines: [...kept, ...missing] };
 }
 
 function fromSaved(saved: Partial<Data> & { version?: number }): Data {
@@ -90,10 +93,9 @@ function fromSaved(saved: Partial<Data> & { version?: number }): Data {
   if ((saved.version ?? 1) < 2 && settings.leadInSec === 3) settings.leadInSec = 10;
   // Keep seed exercises up to date, add the user's own on top.
   const custom = (saved.exercises ?? []).filter((e) => e.custom);
-  return {
+  return withThisWeeksExamples({
     exercises: [...SEED_EXERCISES, ...custom],
-    // v3: the examples became one routine per weekday, Monday to Friday. v4: new Thursday. v5: its EMOM alternates rounds.
-    routines: saved.routines ? ((saved.version ?? 1) < 5 ? withNewExamples(saved.routines) : saved.routines) : seedRoutines(),
+    routines: saved.routines ?? seedRoutines(),
     workouts: saved.workouts ?? [],
     settings,
     settingsAt: saved.settingsAt ?? 0,
@@ -101,7 +103,7 @@ function fromSaved(saved: Partial<Data> & { version?: number }): Data {
     avatar: saved.avatar ?? null,
     avatarAt: saved.avatarAt ?? 0,
     records: saved.records ?? [],
-  };
+  });
 }
 
 function toSynced(d: Data): Synced {
@@ -177,7 +179,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (owner.current !== uid) return;
       cloudKey.current = key;
       // Changes made while this ran are merged on top, and trigger another push.
-      setData((d) => (syncedKey(toSynced(d)) === key ? d : fromSynced(mergeSynced(toSynced(d), merged))));
+      setData((d) => withThisWeeksExamples(syncedKey(toSynced(d)) === key ? d : fromSynced(mergeSynced(toSynced(d), merged))));
       setSync({ status: 'synced', at: Date.now() });
     } catch {
       if (owner.current === uid) setSync((s) => ({ ...s, status: 'error' }));
@@ -222,6 +224,20 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, [userId, syncNow]);
+
+  // A new week while the app stays open: check every hour and when it comes back to the front.
+  useEffect(() => {
+    if (!ready) return;
+    const check = () => setData((d) => withThisWeeksExamples(d));
+    const id = setInterval(check, 60 * 60_000);
+    const doc = typeof document !== 'undefined' ? document : null;
+    const onVisible = () => doc?.visibilityState === 'visible' && check();
+    doc?.addEventListener?.('visibilitychange', onVisible);
+    return () => {
+      clearInterval(id);
+      doc?.removeEventListener?.('visibilitychange', onVisible);
+    };
+  }, [ready]);
 
   // Save every change on the device, and send it to the cloud shortly after.
   useEffect(() => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { View } from 'react-native';
 
 import { ActiveWorkoutCard } from '../components/ActiveWorkoutCard';
+import { LevelBadge } from '../components/LevelBadge';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { blockDurationSec, cloneBlock } from '../lib/blocks';
@@ -62,7 +63,10 @@ export function RoutineDetailScreen({ id }: { id: string }) {
           {routine.blocks.length} {t('routines.blocks')}
           {timed > 0 ? ` · ~${clock(timed)}` : ''}
         </Txt>
-        {routine.example ? <Badge label={t('common.example')} /> : null}
+        <Row gap={space.xs}>
+          <LevelBadge level={routine.level} />
+          {routine.example ? <Badge label={t('common.example')} /> : null}
+        </Row>
       </Row>
       {routine.note ? (
         <Txt color={colors.muted} style={{ marginTop: space.sm }}>
