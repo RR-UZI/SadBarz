@@ -51,6 +51,28 @@ export function useMyPlan() {
 }
 
 /** Plan days done this week: a workout of that day's routine since Monday. */
+/** A routine of the athlete's real plan, as Home and Rutinas list it. */
+export interface PlanRoutine {
+  routine: Routine;
+  name: string;
+  /** From the coach plan: it opens Mi plan (it isn't one of the saved routines). */
+  coach: boolean;
+}
+
+/** The athlete's real plan: the coach plan's days (until the plan ends), then routines from plan codes.
+ * Empty when they have neither; then the example week stands in for a plan. */
+export function usePlanRoutines(): PlanRoutine[] {
+  const t = useT();
+  const { routines } = useApp();
+  const plan = useMyPlan();
+  const coach =
+    plan && planTiming(plan, isoDay(Date.now())).phase !== 'ended'
+      ? plan.days.map((d) => ({ routine: d.routine, name: withDay(d.routine.name, t(`dayLong.${d.day}` as StringKey)), coach: true }))
+      : [];
+  const fromCodes = routines.filter((r) => r.fromCode && !r.example).map((r) => ({ routine: r, name: r.name, coach: false }));
+  return [...coach, ...fromCodes];
+}
+
 function useDoneThisWeek() {
   const { workouts } = useApp();
   const monday = startOfWeek(Date.now());

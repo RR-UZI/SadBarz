@@ -19,7 +19,7 @@ import { colors, space } from '../theme';
 import { UsersHomeCard } from './AdminUsersScreen';
 import { ReviewHomeCard } from './CoachReviewScreen';
 import { ExerciseReviewHomeCard } from './ExerciseReviewScreen';
-import { MyPlanHomeCard } from './MyPlanScreen';
+import { MyPlanHomeCard, usePlanRoutines } from './MyPlanScreen';
 import { WorkoutCard } from './HistoryScreen';
 
 export function HomeScreen() {
@@ -34,9 +34,16 @@ export function HomeScreen() {
   const thisWeek = workouts.filter((w) => w.startedAt >= weekStart);
   const minutes = Math.round(thisWeek.reduce((s, w) => s + (w.finishedAt - w.startedAt), 0) / 60000);
   const last = workouts[0];
-  // The example week first (Monday to Friday, whatever order they're saved in), then the user's own.
+  // With a plan (from the coach or a plan code) its routines replace the examples, then the user's own.
+  // Without one: the example week first (Monday to Friday, whatever order they're saved in), then the user's own.
+  const plan = usePlanRoutines();
+  const own = routines.filter((r) => !r.example && !r.fromCode);
   const week = WEEK_ROUTINE_IDS.map((id) => routines.find((r) => r.id === id)).filter((r): r is NonNullable<typeof r> => !!r);
-  const quick = [...week, ...routines.filter((r) => !WEEK_ROUTINE_IDS.includes(r.id))].slice(0, 5);
+  const quick = (
+    plan.length
+      ? [...plan, ...own.map((r) => ({ routine: r, name: r.name, coach: false }))]
+      : [...week, ...routines.filter((r) => !WEEK_ROUTINE_IDS.includes(r.id))].map((r) => ({ routine: r, name: r.name, coach: false }))
+  ).slice(0, 5);
 
   return (
     <Screen
@@ -106,18 +113,18 @@ export function HomeScreen() {
 
       <Section title={t('home.quickStart')}>
         <View style={{ gap: space.sm }}>
-          {quick.map((r) => (
-            <Card key={r.id} onPress={() => nav.push({ name: 'routine', id: r.id })} style={{ paddingVertical: space.md }}>
+          {quick.map(({ routine: r, name, coach }) => (
+            <Card key={r.id} onPress={() => nav.push(coach ? { name: 'myPlan' } : { name: 'routine', id: r.id })} style={{ paddingVertical: space.md }}>
               <Row style={{ justifyContent: 'space-between' }}>
                 <View style={{ flex: 1 }}>
                   <Txt style={{ fontWeight: '700' }} numberOfLines={1}>
-                    {r.name}
+                    {name}
                   </Txt>
                   <Txt variant="small" color={colors.muted} numberOfLines={1}>
                     {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))).join(' · ')}
                   </Txt>
                 </View>
-                <Button label={t('common.start')} size="sm" onPress={() => nav.push({ name: 'workout', routineId: r.id })} />
+                <Button label={t('common.start')} size="sm" onPress={() => nav.push({ name: 'workout', routineId: r.id, routine: coach ? r : undefined })} />
               </Row>
             </Card>
           ))}
