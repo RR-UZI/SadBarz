@@ -50,7 +50,6 @@ export function useMyPlan() {
   return plan;
 }
 
-/** Plan days done this week: a workout of that day's routine since Monday. */
 /** A routine of the athlete's real plan, as Home and Rutinas list it. */
 export interface PlanRoutine {
   routine: Routine;
@@ -73,10 +72,28 @@ export function usePlanRoutines(): PlanRoutine[] {
   return [...coach, ...fromCodes];
 }
 
-function useDoneThisWeek() {
+const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * The plan days (0 = Monday) done this week. Each workout since Monday counts for one day: the day whose
+ * routine it ran, else the day whose routine has the same name, else (a routine from any version of the
+ * coach plan) the day it was done on. When Uzi approves a change to the plan, its routines get new ids,
+ * so workouts done before the change still count.
+ */
+function useDoneDays(plan: MyPlan | null | undefined): Set<number> {
   const { workouts } = useApp();
+  const done = new Set<number>();
+  if (!plan) return done;
   const monday = startOfWeek(Date.now());
-  return (r: Routine) => workouts.some((w) => w.routineId === r.id && w.startedAt >= monday);
+  for (const w of workouts) {
+    if (w.startedAt < monday) continue;
+    const day =
+      plan.days.find((d) => d.routine.id === w.routineId) ??
+      plan.days.find((d) => sameName(d.routine.name, w.routineName)) ??
+      (w.routineId?.startsWith('rt_coach_') ? plan.days.find((d) => d.day === weekday(new Date(w.startedAt))) : undefined);
+    if (day) done.add(day.day);
+  }
+  return done;
 }
 
 function todayIndex() {
@@ -98,7 +115,7 @@ export function MyPlanHomeCard() {
   const nav = useNav();
   const { settings } = useApp();
   const plan = useMyPlan();
-  const done = useDoneThisWeek();
+  const doneDays = useDoneDays(plan);
   if (!plan) return null;
   const timing = planTiming(plan, isoDay(Date.now()));
 
@@ -137,7 +154,7 @@ export function MyPlanHomeCard() {
             <Txt variant="small" color={colors.muted} numberOfLines={2} style={{ marginTop: space.xs }}>
               {todays.routine.blocks.map((b) => b.title).filter(Boolean).join(' · ')}
             </Txt>
-            {done(todays.routine) ? (
+            {doneDays.has(todays.day) ? (
               <Txt color={colors.success} style={{ fontWeight: '700', marginTop: space.md }}>
                 ✓ {t('myPlan.doneToday')}
               </Txt>
@@ -173,7 +190,7 @@ export function MyPlanScreen() {
   const nav = useNav();
   const { settings } = useApp();
   const plan = useMyPlan();
-  const done = useDoneThisWeek();
+  const doneDays = useDoneDays(plan);
   const today = todayIndex();
   const [picked, setPicked] = useState<number | null>(null);
 
@@ -220,7 +237,7 @@ export function MyPlanScreen() {
         {[0, 1, 2, 3, 4, 5, 6].map((d) => {
           const r = training.get(d);
           const on = d === selected;
-          const ok = r ? done(r) : false;
+          const ok = !!r && doneDays.has(d);
           return (
             <Pressable
               key={d}
@@ -263,7 +280,7 @@ export function MyPlanScreen() {
           <Txt variant="h2" style={{ marginTop: space.xs }}>
             {routine.name}
           </Txt>
-          {done(routine) ? (
+          {doneDays.has(selected) ? (
             <Txt color={colors.success} style={{ fontWeight: '700', marginTop: space.xs }}>
               ✓ {t('myPlan.doneThisWeek')}
             </Txt>
