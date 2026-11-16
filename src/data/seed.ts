@@ -48,6 +48,50 @@ export const SEED_EXERCISES: Exercise[] = [
   { id: 'ex_calorias', name: 'Calorías (bici / remo)', kind: 'calories', category: 'cardio' },
 ];
 
+// English names for the starter exercises, shown when the app is in English. The tubos (tubo, chimuela, cuerda...)
+// are street workout terms and keep their name.
+const EXERCISE_EN: Record<string, string> = {
+  ex_fondos: 'Dips',
+  ex_bardips: 'Bar dips',
+  ex_push: 'Push ups',
+  ex_push_cerrada: 'Close-grip push ups',
+  ex_hspu: 'Handstand push ups (HSPU)',
+  ex_rompe: 'Skull crushers',
+  ex_pull: 'Pull ups',
+  ex_chin: 'Chin ups',
+  ex_muscle: 'Muscle ups',
+  ex_australian: 'Australian pull ups',
+  ex_chin_hold: 'Chin up hold',
+  ex_dead_hang: 'Dead hang',
+  ex_sentadilla: 'Squats',
+  ex_sentadilla_expl: 'Jump squats',
+  ex_sentadilla_iso: 'Squat hold',
+  ex_goblet: 'Goblet squat',
+  ex_desplantes: 'Lunges (per leg)',
+  ex_desplantes_expl: 'Jumping lunges',
+  ex_bulgaras: 'Bulgarian split squats (per leg)',
+  ex_stepup: 'Explosive step ups',
+  ex_pistol: 'Pistol squat',
+  ex_boxjump: 'Box jumps',
+  ex_lsit: 'L-sit',
+  ex_t2b: 'Toes to bar',
+  ex_legraise: 'Leg raises',
+  ex_front: 'Front lever',
+  ex_handstand: 'Handstand',
+  ex_lsit_hs: 'L-sit to handstand',
+  ex_burpees: 'Burpees',
+  ex_medio_burpee: 'Half burpees',
+  ex_correr: 'Run',
+  ex_calorias: 'Calories (bike / row)',
+};
+const SEED_NAMES = new Map(SEED_EXERCISES.map((e) => [e.id, e.name]));
+
+/** A starter exercise in the app's language. One the athlete renamed keeps their name. */
+export function localExercise(e: Exercise, language: string): Exercise {
+  const en = language === 'en' ? EXERCISE_EN[e.id] : undefined;
+  return en && e.name === SEED_NAMES.get(e.id) ? { ...e, name: en } : e;
+}
+
 let n = 0;
 const id = (p: string) => `${p}_seed_${++n}`;
 

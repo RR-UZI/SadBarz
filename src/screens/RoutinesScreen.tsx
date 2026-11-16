@@ -92,7 +92,7 @@ function RoutineCard({ routine: r, name, highlight, onPress }: { routine: Routin
         {r.blocks.slice(0, 4).map((b) => (
           <Txt key={b.id} variant="small" color={colors.muted} numberOfLines={1}>
             • {b.title ? `${b.title}: ` : ''}
-            {formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))}
+            {formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'), t('block.format.circuit'))}
           </Txt>
         ))}
       </View>
@@ -129,13 +129,13 @@ export function BlockSummary({ block, index, names }: { block: Block; index?: nu
       <Row style={{ justifyContent: 'space-between' }}>
         <Txt style={{ fontWeight: '800' }} numberOfLines={1}>
           {index != null ? `${index + 1}. ` : ''}
-          {block.title || formatLabel(block, t('common.rounds'), t('common.sets'), t('common.cap'))}
+          {block.title || formatLabel(block, t('common.rounds'), t('common.sets'), t('common.cap'), t('block.format.circuit'))}
         </Txt>
         {dur > 0 && block.format !== 'sets' && block.format !== 'amrap' && block.format !== 'fortime' ? <Txt variant="small" color={colors.muted}>{clock(dur)}</Txt> : null}
       </Row>
       {block.title ? (
         <Txt variant="small" color={colors.accent}>
-          {formatLabel(block, t('common.rounds'), t('common.sets'), t('common.cap'))}
+          {formatLabel(block, t('common.rounds'), t('common.sets'), t('common.cap'), t('block.format.circuit'))}
           {block.format === 'emom' && block.perRound === 'rotate' ? ` · ${t('block.perRound.rotate').toLowerCase()}` : ''}
         </Txt>
       ) : null}

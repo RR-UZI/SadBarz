@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { exampleMonday, isOldExample, SEED_EXERCISES, seedRoutines } from '../data/seed';
+import { exampleMonday, isOldExample, localExercise, SEED_EXERCISES, seedRoutines } from '../data/seed';
 import { useExercisePool } from '../lib/exercisePool';
 import { setVolume } from '../lib/sound';
 import { mergeSynced, pullRemote, pushRemote, syncEnabled, syncedKey, type Synced } from '../lib/sync';
@@ -274,11 +274,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   // The user's exercises (seed + their own), then the approved ones from the shared pool they don't have.
   const pool = useExercisePool();
+  const language = data.settings.language;
   const exercises = useMemo(() => {
     const have = new Set(data.exercises.map((e) => e.id));
     const extra = pool.filter((e) => !have.has(e.id));
-    return extra.length ? [...data.exercises, ...extra] : data.exercises;
-  }, [data.exercises, pool]);
+    const all = extra.length ? [...data.exercises, ...extra] : data.exercises;
+    // Starter exercises in the app's language (only for showing: the saved data keeps its names).
+    return language === 'es' ? all : all.map((e) => localExercise(e, language));
+  }, [data.exercises, pool, language]);
   const exerciseById = useCallback((id: string) => exercises.find((e) => e.id === id), [exercises]);
 
   const saveRoutine = useCallback((r: Routine) => {
@@ -307,7 +310,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const updateExercise = useCallback((e: Exercise) => {
-    setData((d) => ({ ...d, exercises: d.exercises.map((x) => (x.id === e.id ? { ...e, updatedAt: Date.now() } : x)) }));
+    // A starter exercise shown in English and saved with that same name keeps its stored (Spanish) name.
+    const kept = (x: Exercise, language: string) => (e.name === localExercise(x, language).name ? x.name : e.name);
+    setData((d) => ({
+      ...d,
+      exercises: d.exercises.map((x) => (x.id === e.id ? { ...e, name: kept(x, d.settings.language), updatedAt: Date.now() } : x)),
+    }));
   }, []);
 
   const updateSettings = useCallback((patch: Partial<Settings>) => {
