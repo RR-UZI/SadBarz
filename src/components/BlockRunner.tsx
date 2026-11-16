@@ -212,8 +212,9 @@ function TimedRunner({ block, onFinish, resume, report }: Props) {
   const forwardRound = seg.kind === 'leadin' ? 1 : seg.round + 1;
 
   const roundItems = itemsForRound(block, Math.max(1, seg.round));
-  const nextRound = seg.kind === 'leadin' ? 1 : seg.round + 1;
-  const nextItems = nextRound <= block.rounds ? itemsForRound(block, nextRound) : [];
+  // No "Next" during the get ready: it would repeat round 1, which already shows as what's coming.
+  const nextRound = seg.round + 1;
+  const nextItems = seg.kind !== 'leadin' && nextRound <= block.rounds ? itemsForRound(block, nextRound) : [];
   const color = seg.kind === 'work' ? colors.accent : seg.kind === 'rest' ? colors.rest : colors.warn;
   const label = seg.kind === 'work' ? t('run.work') : seg.kind === 'rest' ? t('run.rest') : t('run.getReady');
   const workElapsed = Math.max(0, tSec - leadIn);
