@@ -8,6 +8,7 @@ import { Badge, Button, Card, Field, Row, Screen, Section, Txt } from '../compon
 import { useT, type StringKey } from '../i18n';
 import {
   approvePlan,
+  checkPlans,
   loadPlan,
   onPlansChanged,
   plansChanged,
@@ -62,6 +63,8 @@ export function CoachReviewScreen() {
 
   const refresh = useCallback(() => {
     reviewList()
+      // A plan still being written may be done in the server's queue: pick it up, then show the list again.
+      .then(async (l) => (l.pending.some((p) => p.status === 'writing') && (await checkPlans()) ? reviewList() : l))
       .then((l) => {
         setList(l);
         setFailed(false);

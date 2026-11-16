@@ -83,6 +83,16 @@ export async function askForPlan(weeks: PlanWeeks, exercises: Exercise[], langua
   return { ok: false, error: code === 'limit' || code === 'profile' || code === 'pro' ? code : 'failed', detail };
 }
 
+/**
+ * A plan that took too long to write right away goes to a queue on the server; this asks the server to pick up
+ * the ones that are done (the athlete's own, or all of them for an admin). True when it checked.
+ */
+export async function checkPlans(): Promise<boolean> {
+  if (!supabase) return false;
+  const { error } = await supabase.functions.invoke('coach-plan', { body: { poll: true } }).catch((e: unknown) => ({ error: e }));
+  return !error;
+}
+
 /** Admins only (row level security): why a plan failed, as the server saved it. */
 export async function planError(id: string): Promise<string | null> {
   if (!supabase) return null;

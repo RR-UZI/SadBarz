@@ -8,6 +8,8 @@
 //   -> 200 { id, status }             a plan is already being written or reviewed, nothing new started
 // POST { rewrite: planId, note, exercises } (admins only): Uzi sends a plan back with a note;
 //   the coach writes it again following the note -> 202 { id, status: 'writing' }
+// POST { poll: true }: checks plans that went to the batch queue (see writePlan) and saves the ones that are
+//   done: the athlete's own, or every one for an admin -> 200 { checked }
 // POST { change, messageId?, today, language, exercises }: the athlete sends a plan change the chat coach proposed
 //   (coach-chat). The coach writes a new version of their current plan with that change, same length and start,
 //   for Uzi's review -> 202 { id, status: 'writing' }; 409 { error: 'busy' } while another plan waits for review,
@@ -26,6 +28,10 @@ const MODEL = 'claude-opus-5-5';
 const PLAN_LENGTHS = [1, 2, 4];
 const PLANS_PER_DAY = 3; // new plans one athlete can ask for in 24 hours
 const STUCK_AFTER_MS = 10 * 60 * 1000; // a plan still 'writing' after this failed silently
+// Supabase stops a function after 150 s (free plan; 400 s on paid). A plan that isn't written by FAST_MS goes to
+// Anthropic's batch queue instead, which has no time limit; the app checks back with { poll: true }.
+const FAST_MS = 110 * 1000;
+const BATCH_STUCK_MS = 25 * 3600 * 1000; // a batch ends within 24 hours
 const LOG_DAYS = 28; // how much recent training the coach reads
 const CHAT_MESSAGES = 40; // how much of their recent chat with the coach it reads
 
@@ -349,6 +355,8 @@ type Stored = ReturnType<typeof athleteInput> & {
   coachNotes?: string;
   /** What the athlete answered right before asking for this new plan (when they had one before). */
   checkIn?: CheckIn;
+  /** The batch the plan is being written in, when it took too long to write right away. */
+  batch?: { id: string; at: string };
   /** Their recent chat with the coach, oldest first. */
   coachChat?: { date: string; from: 'athlete' | 'coach'; text: string }[];
 };
@@ -375,7 +383,7 @@ function cleanCheckIn(v: unknown): CheckIn | undefined {
 
 /** The part of the stored input Claude reads about the athlete. */
 function aboutAthlete(input: Stored) {
-  const { athlete: _a, trainingDays: _t, exercises: _e, revisions: _r, change: _c, ...rest } = input;
+  const { athlete: _a, trainingDays: _t, exercises: _e, revisions: _r, change: _c, batch: _b, ...rest } = input;
   return rest;
 }
 
@@ -417,6 +425,7 @@ Deno.serve(async (req) => {
   if (user.app_metadata?.plan !== 'pro' && !isAdmin) return json({ error: 'pro' }, 403);
 
   const body = await req.json().catch(() => ({}));
+  if (body.poll === true) return json({ checked: await pollBatches(isAdmin ? null : user.id) });
   if (typeof body.rewrite === 'string') {
     if (!isAdmin) return json({ error: 'admin' }, 403);
     return rewrite(body.rewrite, String(body.note ?? '').trim().slice(0, 2000), cleanExercises(body.exercises), user.id);
@@ -437,14 +446,27 @@ Deno.serve(async (req) => {
   if (!profile?.goal || !trainingDays.length) return json({ error: 'profile' }, 400);
 
   // One plan at a time: if one is being written or reviewed, that's the answer.
-  const { data: latest } = await db.from('coach_plans').select('id, status, updated_at').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle();
+  const { data: latest } = await db
+    .from('coach_plans')
+    .select('id, status, updated_at, batch:input->batch')
+    .eq('user_id', user.id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (latest && ['writing', 'review', 'returned'].includes(latest.status)) {
-    const stuck = latest.status === 'writing' && Date.now() - new Date(latest.updated_at).getTime() > STUCK_AFTER_MS;
+    const waited = Date.now() - new Date(latest.updated_at).getTime();
+    const stuck = latest.status === 'writing' && waited > (latest.batch ? BATCH_STUCK_MS : STUCK_AFTER_MS);
     if (!stuck) return change === null ? json({ id: latest.id, status: latest.status }) : json({ error: 'busy', id: latest.id, status: latest.status }, 409);
     await db.from('coach_plans').update({ status: 'failed', error: 'timed out', updated_at: new Date().toISOString() }).eq('id', latest.id);
   }
   if (!isAdmin) {
-    const { count } = await db.from('coach_plans').select('id', { count: 'exact', head: true }).eq('user_id', user.id).gte('created_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
+    // Plans that failed on our side don't count.
+    const { count } = await db
+      .from('coach_plans')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id)
+      .neq('status', 'failed')
+      .gte('created_at', new Date(Date.now() - 24 * 3600 * 1000).toISOString());
     if ((count ?? 0) >= PLANS_PER_DAY) return json({ error: 'limit' }, 429);
   }
 
@@ -504,7 +526,8 @@ Deno.serve(async (req) => {
     }
   }
 
-  // Writing takes a minute or two; the app checks back with my_coach_plan_status().
+  // Writing takes a minute or two (longer ones finish in the batch queue); the app checks back with
+  // my_coach_plan_status() and { poll: true }.
   EdgeRuntime.waitUntil(writePlan(created.id, input, trainingDays, exercises));
   return json({ id: created.id, status: 'writing' }, 202);
 });
@@ -521,7 +544,8 @@ async function rewrite(planId: string, note: string, fallbackExercises: Exercise
   if (!trainingDays.length || exercises.length < 5) return json({ error: 'input' }, 400);
   const now = new Date().toISOString();
   const revisions = [...(input.revisions ?? []), ...(row.plan ? [{ plan: row.plan, note, at: now }] : [])];
-  const next: Stored = { ...input, trainingDays, exercises, revisions };
+  const { batch: _b, ...rest } = input;
+  const next: Stored = { ...rest, trainingDays, exercises, revisions };
   const { error } = await db
     .from('coach_plans')
     .update({ status: 'writing', input: next, review_note: note, reviewed_by: reviewer, reviewed_at: now, error: null, updated_at: now })
@@ -537,68 +561,124 @@ async function pastNotes(): Promise<string[]> {
   return (data ?? []).map((r: { review_note: string }) => r.review_note).filter(Boolean);
 }
 
+// What Claude is asked to write: the same for the quick try and for the batch queue.
+async function planRequest(input: Stored, trainingDays: number[], exercises: Exercise[]): Promise<Anthropic.Beta.Messages.BatchCreateParams.Request['params']> {
+  const last = input.revisions?.[input.revisions.length - 1];
+  const notes = (await pastNotes()).filter((n) => n !== last?.note);
+  return {
+    model: MODEL,
+    max_tokens: 32000,
+    thinking: { type: 'adaptive' },
+    output_config: { effort: 'medium', format: { type: 'json_schema', schema: planSchema(exercises.map((e) => e.id)) } },
+    system: [{ type: 'text', text: METHOD, cache_control: { type: 'ephemeral' } }],
+    messages: [
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: `The athlete's exercise list (use only these ids):\n${JSON.stringify(exercises)}` },
+          { type: 'text', text: `The athlete:\n${JSON.stringify(aboutAthlete(input))}` },
+          ...(notes.length
+            ? [{ type: 'text' as const, text: `Uzi's recent corrections on plans you wrote (for any athlete). Keep following them where they apply:\n${notes.map((n) => `- ${n}`).join('\n')}` }]
+            : []),
+          ...(input.change
+            ? [
+                {
+                  type: 'text' as const,
+                  text: `The athlete asked to change their current plan (previousPlan in the athlete data) in the coach chat. The change, as the chat coach agreed it with them:\n"${input.change.note}"\n\nWrite the new version of that plan: make this change and keep everything else as it is, unless the change needs more. Start the summary (for Uzi) with what the athlete asked for, then what you changed.`,
+                },
+              ]
+            : []),
+          ...(last
+            ? [
+                {
+                  type: 'text' as const,
+                  text: `Uzi reviewed your previous version of this plan and sent it back with this note:\n"${last.note}"\n\nThe version he sent back:\n${JSON.stringify(last.plan)}\n\nWrite a new version that does what his note asks and keeps what he didn't object to. Say in the summary what you changed.`,
+                },
+              ]
+            : []),
+          {
+            type: 'text',
+            text: `Write one week for this athlete: one routine for each training day (${trainingDays.join(', ')}). It repeats for ${input.planWeeks} week(s) starting ${input.planStarts}. Write the routines in ${input.language === 'en' ? 'English' : 'Spanish'}; the summary for Uzi in Spanish.`,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+const markPlan = (planId: string, fields: Record<string, unknown>) =>
+  db.from('coach_plans').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', planId);
+
+// Claude's answer becomes the plan for Uzi's review (or the plan's error).
+async function savePlan(planId: string, message: { model: string; usage: unknown; stop_reason: string | null; content: { type: string; text?: string }[] }, trainingDays: number[], exercises: Exercise[]) {
+  const usage = { model: message.model, ...(message.usage as Record<string, unknown>) };
+  if (message.stop_reason === 'refusal' || message.stop_reason === 'max_tokens') {
+    await markPlan(planId, { status: 'failed', error: `stop_reason ${message.stop_reason}`, usage });
+    return;
+  }
+  const answer = message.content.find((b) => b.type === 'text');
+  if (!answer?.text) throw new Error('no text in the answer');
+  const plan = toPlan(JSON.parse(answer.text) as PlanOut, planId, trainingDays, exercises);
+  await markPlan(planId, { status: 'review', plan, usage });
+}
+
 async function writePlan(planId: string, input: Stored, trainingDays: number[], exercises: Exercise[]) {
-  const finish = (fields: Record<string, unknown>) => db.from('coach_plans').update({ ...fields, updated_at: new Date().toISOString() }).eq('id', planId);
+  let tooSlow = false;
   try {
     // Made here, not at start-up, so a missing ANTHROPIC_API_KEY shows up as this plan's error.
     const claude = new Anthropic(); // reads ANTHROPIC_API_KEY
-    const last = input.revisions?.[input.revisions.length - 1];
-    const notes = (await pastNotes()).filter((n) => n !== last?.note);
-    const message = await claude.beta.messages
-      .stream({
-        model: MODEL,
-        max_tokens: 32000,
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
-        thinking: { type: 'adaptive' },
-        output_config: { effort: 'medium', format: { type: 'json_schema', schema: planSchema(exercises.map((e) => e.id)) } },
-        system: [{ type: 'text', text: METHOD, cache_control: { type: 'ephemeral' } }],
-        messages: [
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: `The athlete's exercise list (use only these ids):\n${JSON.stringify(exercises)}` },
-              { type: 'text', text: `The athlete:\n${JSON.stringify(aboutAthlete(input))}` },
-              ...(notes.length
-                ? [{ type: 'text' as const, text: `Uzi's recent corrections on plans you wrote (for any athlete). Keep following them where they apply:\n${notes.map((n) => `- ${n}`).join('\n')}` }]
-                : []),
-              ...(input.change
-                ? [
-                    {
-                      type: 'text' as const,
-                      text: `The athlete asked to change their current plan (previousPlan in the athlete data) in the coach chat. The change, as the chat coach agreed it with them:\n"${input.change.note}"\n\nWrite the new version of that plan: make this change and keep everything else as it is, unless the change needs more. Start the summary (for Uzi) with what the athlete asked for, then what you changed.`,
-                    },
-                  ]
-                : []),
-              ...(last
-                ? [
-                    {
-                      type: 'text' as const,
-                      text: `Uzi reviewed your previous version of this plan and sent it back with this note:\n"${last.note}"\n\nThe version he sent back:\n${JSON.stringify(last.plan)}\n\nWrite a new version that does what his note asks and keeps what he didn't object to. Say in the summary what you changed.`,
-                    },
-                  ]
-                : []),
-              {
-                type: 'text',
-                text: `Write one week for this athlete: one routine for each training day (${trainingDays.join(', ')}). It repeats for ${input.planWeeks} week(s) starting ${input.planStarts}. Write the routines in ${input.language === 'en' ? 'English' : 'Spanish'}; the summary for Uzi in Spanish.`,
-              },
-            ],
-          },
-        ],
-      })
-      .finalMessage();
-
-    const usage = { model: message.model, ...message.usage };
-    if (message.stop_reason === 'refusal' || message.stop_reason === 'max_tokens') {
-      await finish({ status: 'failed', error: `stop_reason ${message.stop_reason}`, usage });
+    const params = await planRequest(input, trainingDays, exercises);
+    const stream = claude.beta.messages.stream({ ...params, betas: ['server-side-fallback-2026-07-01'], fallbacks: 'default' });
+    // Not done before Supabase would stop this function: stop waiting and hand it to the batch queue.
+    const timer = setTimeout(() => {
+      tooSlow = true;
+      stream.abort();
+    }, FAST_MS);
+    let message;
+    try {
+      message = await stream.finalMessage();
+    } catch (e) {
+      if (!tooSlow) throw e;
+      const batch = await claude.beta.messages.batches.create({ requests: [{ custom_id: planId, params }] });
+      await markPlan(planId, { input: { ...input, batch: { id: batch.id, at: new Date().toISOString() } } });
+      console.log('coach-plan', planId, 'too slow, sent to batch', batch.id);
       return;
+    } finally {
+      clearTimeout(timer);
     }
-    const answer = message.content.find((b) => b.type === 'text');
-    if (!answer || answer.type !== 'text') throw new Error('no text in the answer');
-    const plan = toPlan(JSON.parse(answer.text) as PlanOut, planId, trainingDays, exercises);
-    await finish({ status: 'review', plan, usage });
+    await savePlan(planId, message, trainingDays, exercises);
   } catch (e) {
     console.error('coach-plan', planId, e);
-    await finish({ status: 'failed', error: String(e instanceof Error ? e.message : e).slice(0, 500) });
+    await markPlan(planId, { status: 'failed', error: String(e instanceof Error ? e.message : e).slice(0, 500) });
   }
+}
+
+// Plans in the batch queue: save the ones that are done. Only the athlete's own (userId), or all for an admin (null).
+async function pollBatches(userId: string | null): Promise<number> {
+  let query = db.from('coach_plans').select('id, input').eq('status', 'writing').not('input->batch', 'is', null).limit(10);
+  if (userId) query = query.eq('user_id', userId);
+  const { data } = await query;
+  const rows = (data ?? []) as { id: string; input: Stored }[];
+  if (!rows.length) return 0;
+  const claude = new Anthropic();
+  for (const row of rows) {
+    const batchId = row.input.batch?.id;
+    if (!batchId) continue;
+    try {
+      const batch = await claude.beta.messages.batches.retrieve(batchId);
+      if (batch.processing_status !== 'ended') continue;
+      let found = false;
+      for await (const r of await claude.beta.messages.batches.results(batchId)) {
+        if (r.custom_id !== row.id) continue;
+        found = true;
+        if (r.result.type === 'succeeded') await savePlan(row.id, r.result.message, row.input.trainingDays ?? [], row.input.exercises ?? []);
+        else await markPlan(row.id, { status: 'failed', error: `batch ${r.result.type}${r.result.type === 'errored' ? `: ${JSON.stringify(r.result.error).slice(0, 300)}` : ''}` });
+      }
+      if (!found) await markPlan(row.id, { status: 'failed', error: 'batch ended without this plan' });
+    } catch (e) {
+      console.error('coach-plan poll', row.id, e);
+      await markPlan(row.id, { status: 'failed', error: String(e instanceof Error ? e.message : e).slice(0, 500) });
+    }
+  }
+  return rows.length;
 }
