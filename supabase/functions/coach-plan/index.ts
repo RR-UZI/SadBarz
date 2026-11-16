@@ -653,17 +653,24 @@ async function writePlan(planId: string, input: Stored, trainingDays: number[], 
   }
 }
 
-// Plans in the batch queue: save the ones that are done. Only the athlete's own (userId), or all for an admin (null).
+// Plans still being written: save the ones done in the batch queue, and close the ones that were cut off
+// (so the athlete can ask again). Only the athlete's own (userId), or all for an admin (null).
 async function pollBatches(userId: string | null): Promise<number> {
-  let query = db.from('coach_plans').select('id, input').eq('status', 'writing').not('input->batch', 'is', null).limit(10);
+  let query = db.from('coach_plans').select('id, input, updated_at').eq('status', 'writing').limit(20);
   if (userId) query = query.eq('user_id', userId);
   const { data } = await query;
-  const rows = (data ?? []) as { id: string; input: Stored }[];
+  const rows = (data ?? []) as { id: string; input: Stored; updated_at: string }[];
   if (!rows.length) return 0;
-  const claude = new Anthropic();
+  let claude: Anthropic | null = null;
   for (const row of rows) {
     const batchId = row.input.batch?.id;
+    const waited = Date.now() - new Date(row.updated_at).getTime();
+    if (waited > (batchId ? BATCH_STUCK_MS : STUCK_AFTER_MS)) {
+      await markPlan(row.id, { status: 'failed', error: 'timed out' });
+      continue;
+    }
     if (!batchId) continue;
+    claude ??= new Anthropic();
     try {
       const batch = await claude.beta.messages.batches.retrieve(batchId);
       if (batch.processing_status !== 'ended') continue;
