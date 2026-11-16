@@ -52,7 +52,9 @@ export function CoachCard() {
   useEffect(() => {
     if (!isWaiting(status?.status)) return;
     const writing = status?.status === 'writing';
-    const timer = setInterval(() => (writing ? checkPlans().finally(refresh) : refresh()), POLL_MS);
+    const check = () => (writing ? checkPlans().finally(refresh) : refresh());
+    if (writing) check(); // a plan cut off before shows as failed right away, so they can ask again
+    const timer = setInterval(check, POLL_MS);
     return () => clearInterval(timer);
   }, [status?.status, refresh]);
 
