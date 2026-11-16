@@ -56,7 +56,7 @@ Anything else (homework, code, news, politics, money, relationships not about th
 - Short: usually 2 to 6 sentences, or a short list. At most about 150 words unless they ask for detail. No headings. Plain text; short "-" lists are fine.
 - Use what you know about the athlete below: your notes on them, their level, goal, equipment, injuries, recent workouts and the feedback they left on blocks (feel: easy, good, hard, max; paused; their notes), records and plan. Refer to specific workouts and numbers when it helps.
 - Give concrete advice: sets, reps, seconds, rest, which progression or regression, a cue to fix technique. Respect their equipment and injuries.
-- If they want to change their plan: talk it through and say what you would change and why. When they have a plan from Uzi and you both agree on the change, call propose_plan_change: the app shows it under your answer with a button, they send it, the coach rewrites the plan and Uzi reviews it before it shows in their Mi plan. Only propose what they asked for or agreed to, one proposal per answer, and also say it in your text in a sentence. Small one-off tweaks they can do themselves with ✎ Editar in the routine. With no plan yet, they ask for one from Inicio.
+- If they want to change their plan: talk it through and say what you would change and why. When they have a plan from Uzi and you both agree on the change, call propose_plan_change: the app shows it under your answer, with every change you list in details (before → after, so they know exactly what they are asking for) and a button; they send it, the coach rewrites the plan and Uzi reviews it before it shows in their Mi plan. Only propose what they asked for or agreed to, one proposal per answer, and also say it in your text in a sentence. Small one-off tweaks they can do themselves with ✎ Editar in the routine. With no plan yet, they ask for one from Inicio.
 - Pain or injury: general, conservative advice (stop what hurts, easier variations, rest), and tell them to see a doctor or physiotherapist if it is sharp, keeps coming back or doesn't get better. Never diagnose.
 - Mental health: be supportive and practical. If they talk about feeling hopeless, hurting themselves or not wanting to live, put that first: respond with care, encourage them to talk to someone they trust and to a professional, and give a crisis line (in Mexico: Línea de la Vida 800 911 2000; elsewhere: their local emergency number). Don't go back to training in that answer.
 - Don't make up data you don't have. If something isn't in what you know about them, ask.
@@ -81,8 +81,14 @@ const PROPOSE = {
         type: 'string',
         description: 'For whoever rewrites the plan, in Spanish: exactly what to change and why (which days, blocks, exercises, numbers, rest), and that everything else stays the same.',
       },
+      details: {
+        type: 'array',
+        items: { type: 'string' },
+        description:
+          'What the athlete sees before sending it, in their language: every concrete change, one item each, naming the day and block and giving the numbers as before → after. E.g. "Lunes · Bloque 2: muscle ups 10 → 6", "Lunes: descanso entre bloques 2:00 → 3:00", "Sábado: día nuevo". For a new day or routine, also one item per block with its exercises and numbers. Only what changes, the same as in change, at most 12 items.',
+      },
     },
-    required: ['summary', 'change'],
+    required: ['summary', 'change', 'details'],
     additionalProperties: false,
   },
 };
@@ -133,7 +139,7 @@ interface PlanDay {
   blocks?: { title?: string; format?: string }[];
 }
 
-type Proposal = { summary: string; change: string; planId?: string; sentAt?: string };
+type Proposal = { summary: string; change: string; details?: string[]; planId?: string; sentAt?: string };
 
 const day = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const DAYS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
@@ -309,7 +315,11 @@ Deno.serve(async (req) => {
         if (call.name === PROPOSE.name && hasPlan && !proposal) {
           const summary = String(call.input?.summary ?? '').trim().slice(0, 200);
           const change = String(call.input?.change ?? '').trim().slice(0, 1500);
-          if (summary && change) proposal = { summary, change };
+          const details = (Array.isArray(call.input?.details) ? call.input.details : [])
+            .map((d) => String(d ?? '').replace(/\s+/g, ' ').trim().slice(0, 200))
+            .filter(Boolean)
+            .slice(0, 12);
+          if (summary && change) proposal = { summary, change, ...(details.length ? { details } : {}) };
         } else if (call.name === REMEMBER.name) {
           const note = String(call.input?.note ?? '').replace(/\s+/g, ' ').trim().slice(0, 200);
           if (note) remembered.push(note);

@@ -10,7 +10,7 @@ import { isoDay } from './records';
 import { supabase } from './supabase';
 
 /** A change to the athlete's plan the coach proposed; planId once the athlete sent it (for Uzi's review). */
-export type Proposal = { summary: string; change: string; planId?: string; sentAt?: string };
+export type Proposal = { summary: string; change: string; details?: string[]; planId?: string; sentAt?: string };
 export type ChatMessage = { id: string; role: 'user' | 'assistant'; content: string; at: number; proposal?: Proposal };
 export type ChatError = 'limit' | 'pro' | 'long' | 'notReady' | 'offline' | 'failed';
 export type SendResult = { ok: true; reply: ChatMessage; left: number | null } | { ok: false; error: ChatError; detail: string };

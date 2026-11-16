@@ -235,6 +235,23 @@ function ProposalCard({ message, sending, error, onSend }: { message: ChatMessag
         {t('coachChat.proposalTitle')}
       </Txt>
       <Txt style={{ fontWeight: '700' }}>{p.summary}</Txt>
+      {p.details?.length ? (
+        <View style={{ gap: 4 }} accessibilityLabel={t('coachChat.proposalDetails')}>
+          <Txt variant="small" color={colors.muted}>
+            {t('coachChat.proposalDetails')}
+          </Txt>
+          {p.details.map((d, i) => (
+            <View key={i} style={{ flexDirection: 'row', gap: space.xs }}>
+              <Txt variant="small" color={colors.accent}>
+                •
+              </Txt>
+              <Txt variant="small" style={{ flex: 1 }}>
+                {d}
+              </Txt>
+            </View>
+          ))}
+        </View>
+      ) : null}
       {p.planId ? (
         <>
           <Txt variant="small" color={colors.success}>
