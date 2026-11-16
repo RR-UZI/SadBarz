@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { askForPlan, coachStatus, isWaiting, planError, PLAN_WEEKS, type AskError, type CoachPlanStatus, type PlanCheckIn, type PlanWeeks } from '../lib/coach';
+import { askForPlan, checkPlans, coachStatus, isWaiting, planError, PLAN_WEEKS, type AskError, type CoachPlanStatus, type PlanCheckIn, type PlanWeeks } from '../lib/coach';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
@@ -48,10 +48,11 @@ export function CoachCard() {
   useEffect(() => {
     if (user?.admin && status?.status === 'failed' && !error) planError(status.id).then((e) => e && setDetail(e));
   }, [user?.admin, status?.status, status?.id, error]);
-  // While the coach writes or Uzi reviews, check back now and then.
+  // While the coach writes or Uzi reviews, check back now and then (a plan still being written may be done in the queue).
   useEffect(() => {
     if (!isWaiting(status?.status)) return;
-    const timer = setInterval(refresh, POLL_MS);
+    const writing = status?.status === 'writing';
+    const timer = setInterval(() => (writing ? checkPlans().finally(refresh) : refresh()), POLL_MS);
     return () => clearInterval(timer);
   }, [status?.status, refresh]);
 
