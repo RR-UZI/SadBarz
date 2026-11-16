@@ -622,6 +622,8 @@ export const en: Record<StringKey, string> = {
   'run.timeLeft': 'Time left',
   'run.addRound': '+1 round',
   'run.undoRound': '−1 round',
+  'run.backToSet': 'Back to set {n}',
+  'run.backToBlock': 'Back to the block',
   'run.fullRounds': 'Full rounds',
   'run.timeUp': 'Time!',
   'run.amrapRounds': '{n} full rounds',

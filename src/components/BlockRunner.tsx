@@ -263,11 +263,13 @@ function SetsRunner({ block, onFinish, resume, report }: Props) {
   const [i, setI] = useState(() => resumed(resume, 'i', 0));
   const [mode, setMode] = useState<'leadin' | 'work' | 'rest'>(() => resumed(resume, 'mode', settings.leadInSec > 0 ? 'leadin' : 'work'));
   const [restDur, setRestDur] = useState(() => resumed(resume, 'restDur', 0));
+  // How long the set just marked done had run, so going back to it picks its clock up where it stopped.
+  const [doneMs, setDoneMs] = useState(() => resumed(resume, 'doneMs', 0));
   const phase = useClock(100, resume?.ms); // current lead-in / set / rest
   const total = useClock(500, resumed(resume, 'total', 0)); // whole block
   const lastTick = useRef('');
   const startedCue = useRef(!!resume && mode !== 'leadin');
-  useReport(report, { ms: phase.elapsedMs, total: total.elapsedMs, i, mode, restDur });
+  useReport(report, { ms: phase.elapsedMs, total: total.elapsedMs, i, mode, restDur, doneMs });
 
   useEffect(() => {
     unlockAudio();
@@ -335,6 +337,7 @@ function SetsRunner({ block, onFinish, resume, report }: Props) {
     if (isLast) return finishBlock();
     if (current.restSec > 0) {
       cues.rest();
+      setDoneMs(phase.elapsedMs);
       setRestDur(current.restSec);
       setMode('rest');
       phase.reset(0, true);
@@ -405,6 +408,17 @@ function SetsRunner({ block, onFinish, resume, report }: Props) {
             }}
           />
         </Row>
+        {/* Tapped "set done" by mistake: back to that set, its clock picking up where it stopped. */}
+        <Button
+          label={`‹ ${t('run.backToSet', { n: current.index })}`}
+          variant="ghost"
+          size="sm"
+          style={{ marginTop: space.md, alignSelf: 'center' }}
+          onPress={() => {
+            setMode('work');
+            phase.reset(doneMs, true);
+          }}
+        />
       </View>
     );
   }
@@ -802,6 +816,19 @@ function ForTimeRunner({ block, onFinish, resume, report }: Props) {
     cues.round(round + 1);
     setSplits([...splits, workSec]);
   };
+  // Finished (or ended) by mistake: back to the running clock, unless the time cap is what ended it.
+  const back =
+    left > 0 ? (
+      <Button
+        label={`‹ ${t('run.backToBlock')}`}
+        variant="ghost"
+        size="sm"
+        onPress={() => {
+          setResult(null);
+          c.start();
+        }}
+      />
+    ) : null;
 
   const splitRow = splits.length ? (
     <Row style={{ justifyContent: 'center', flexWrap: 'wrap', marginTop: space.md }} gap={space.md}>
@@ -832,6 +859,7 @@ function ForTimeRunner({ block, onFinish, resume, report }: Props) {
           style={{ marginTop: space.lg, alignSelf: 'stretch' }}
           onPress={() => onFinish(Math.round(result.timeSec), undefined, { timeSec: Math.round(result.timeSec), rounds: block.rounds })}
         />
+        {back}
       </View>
     );
   }
@@ -860,6 +888,7 @@ function ForTimeRunner({ block, onFinish, resume, report }: Props) {
           style={{ marginTop: space.lg, alignSelf: 'stretch' }}
           onPress={() => onFinish(Math.round(workSec), undefined, { reps, rounds })}
         />
+        {back}
       </View>
     );
   }
@@ -889,6 +918,15 @@ function ForTimeRunner({ block, onFinish, resume, report }: Props) {
       ) : (
         <Button label={`🏁 ${t('run.finished')}`} size="lg" style={{ marginTop: space.xl, minHeight: 72 }} onPress={finish} disabled={lead > 0} />
       )}
+      {splits.length ? (
+        <Button
+          label={t('run.undoRound')}
+          variant="ghost"
+          size="sm"
+          style={{ marginTop: space.sm, alignSelf: 'center' }}
+          onPress={() => setSplits(splits.slice(0, -1))}
+        />
+      ) : null}
       <Controls running={c.running} onToggle={() => (c.running ? c.pause() : c.start())} onFinish={capped} />
     </View>
   );
