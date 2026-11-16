@@ -6,7 +6,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { useT } from '../i18n';
-import { askForPlan, checkPlans, coachStatus, isWaiting, planError, PLAN_WEEKS, type AskError, type CoachPlanStatus, type PlanCheckIn, type PlanWeeks } from '../lib/coach';
+import { askForPlan, checkPlans, coachStatus, isWaiting, myPlan, planError, PLAN_WEEKS, type AskError, type CoachPlanStatus, type PlanCheckIn, type PlanWeeks } from '../lib/coach';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
 import { colors, space } from '../theme';
@@ -45,6 +45,12 @@ export function CoachCard() {
       .catch(() => setStatus((s) => s ?? null));
   }, []);
   useEffect(refresh, [refresh]);
+  // Had a plan before: then every new ask gets the questions, even when the latest ask failed.
+  const [hadPlan, setHadPlan] = useState(false);
+  useEffect(() => {
+    if (user?.id) myPlan(user.id).then((p) => setHadPlan(!!p)).catch(() => {});
+  }, [user?.id]);
+  const withQuestions = !!user?.profile && (status?.status === 'approved' || hadPlan);
   useEffect(() => {
     if (user?.admin && status?.status === 'failed' && !error) planError(status.id).then((e) => e && setDetail(e));
   }, [user?.admin, status?.status, status?.id, error]);
@@ -135,10 +141,10 @@ export function CoachCard() {
         <PlanQuestions profile={user.profile} asking={asking} onSend={ask} onCancel={() => setChecking(false)} />
       ) : (
         <Button
-          label={asking ? t('coach.asking') : status?.status === 'approved' ? t('coach.newPlan') : t('coach.ask')}
+          label={asking ? t('coach.asking') : withQuestions ? t('coach.newPlan') : t('coach.ask')}
           disabled={asking}
           style={{ marginTop: space.md }}
-          onPress={() => (status?.status === 'approved' && user?.profile ? setChecking(true) : ask())}
+          onPress={() => (withQuestions ? setChecking(true) : ask())}
         />
       )}
     </Card>
