@@ -442,6 +442,15 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
   }
 
   // ---- review: Done / Repeat / Skip / Finish ----
+  // Blocks the athlete ends with a tap (a set, a round, "finished") can be reopened where they were, paused,
+  // when that tap was a mistake. Timed blocks end with their clock, so there is nothing to go back to.
+  const canGoBack = ['sets', 'circuit', 'fortime'].includes(block.format) && !!run.current;
+  const backToBlock = () => {
+    if (!run.current) return;
+    runCount.current += 1;
+    resumeRun.current = { run: runCount.current, state: run.current };
+    setPhase({ kind: 'running', run: runCount.current });
+  };
   if (phase.kind === 'review') {
     return (
       <Screen title={t('run.blockFinished')} onBack={exit}>
@@ -503,6 +512,7 @@ export function WorkoutScreen({ routineId, routine: given, resume }: { routineId
               setPhase({ kind: 'summary' });
             }}
           />
+          {canGoBack ? <Button label={`‹ ${t('run.backToBlock')}`} variant="ghost" size="sm" onPress={backToBlock} /> : null}
         </View>
       </Screen>
     );

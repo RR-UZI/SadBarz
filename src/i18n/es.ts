@@ -621,6 +621,8 @@ export const es = {
   'run.timeLeft': 'Tiempo restante',
   'run.addRound': '+1 ronda',
   'run.undoRound': '−1 ronda',
+  'run.backToSet': 'Volver a la serie {n}',
+  'run.backToBlock': 'Volver al bloque',
   'run.fullRounds': 'Rondas completas',
   'run.timeUp': '¡Tiempo!',
   'run.amrapRounds': '{n} rondas completas',
