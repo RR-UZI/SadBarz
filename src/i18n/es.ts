@@ -8,6 +8,7 @@ export const es = {
   'coachChat.placeholder': 'Escríbele a tu coach…',
   'coachChat.send': 'Enviar',
   'coachChat.proposalTitle': 'Cambio a tu plan',
+  'coachChat.proposalDetails': 'Qué cambia:',
   'coachChat.proposalHint': 'Si te late, pídeselo a Uzi: el coach ajusta tu plan y Uzi lo revisa antes de que lo veas en Mi plan.',
   'coachChat.proposalSend': 'Pedir este cambio',
   'coachChat.proposalSending': 'Enviando…',

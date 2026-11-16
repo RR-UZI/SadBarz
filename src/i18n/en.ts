@@ -9,6 +9,7 @@ export const en: Record<StringKey, string> = {
   'coachChat.placeholder': 'Message your coach…',
   'coachChat.send': 'Send',
   'coachChat.proposalTitle': 'Change to your plan',
+  'coachChat.proposalDetails': 'What changes:',
   'coachChat.proposalHint': 'If you like it, ask Uzi: the coach adjusts your plan and Uzi reviews it before it shows in My plan.',
   'coachChat.proposalSend': 'Ask for this change',
   'coachChat.proposalSending': 'Sending…',
