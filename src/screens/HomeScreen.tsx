@@ -127,7 +127,7 @@ export function HomeScreen() {
                   <Row gap={space.xs}>
                     <LevelBadge level={r.level} />
                     <Txt variant="small" color={colors.muted} numberOfLines={1} style={{ flex: 1 }}>
-                      {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'))).join(' · ')}
+                      {r.blocks.map((b) => b.title || formatLabel(b, t('common.rounds'), t('common.sets'), t('common.cap'), t('block.format.circuit'))).join(' · ')}
                     </Txt>
                   </Row>
                 </View>

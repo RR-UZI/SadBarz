@@ -52,7 +52,7 @@ export function blockDurationSec(b: Block): number {
 }
 
 // Short label like 'EMOM 50" · 12 rondas' or 'EM2M · 6 rondas'.
-export function formatLabel(b: Block, roundsWord: string, setsWord: string, capWord: string): string {
+export function formatLabel(b: Block, roundsWord: string, setsWord: string, capWord: string, circuitWord = 'Circuito'): string {
   switch (b.format) {
     case 'emom': {
       const name = b.intervalSec === 60 ? 'EMOM' : b.intervalSec === 120 ? 'EM2M' : `EMOM ${shortDuration(b.intervalSec)}`;
@@ -63,7 +63,7 @@ export function formatLabel(b: Block, roundsWord: string, setsWord: string, capW
     case 'sets':
       return `${b.rows.reduce((n, r) => n + r.sets, 0)} ${setsWord}`;
     case 'circuit':
-      return `Circuito · ${b.rounds} ${roundsWord}`;
+      return `${circuitWord} · ${b.rounds} ${roundsWord}`;
     case 'amrap':
       return `AMRAP ${capLabel(b.capSec ?? DEFAULT_AMRAP_SEC)}`;
     case 'fortime':
