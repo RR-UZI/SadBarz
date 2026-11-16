@@ -118,6 +118,8 @@ export type BlockFeel = 'easy' | 'good' | 'hard' | 'max';
 export interface AmrapScore {
   rounds: number;
   reps: number;
+  /** How long each full round took, in seconds (the coach reads the pacing). */
+  roundSec?: number[];
 }
 
 // For time result: the finish time, or (time cap reached / stopped early) the reps done.
@@ -125,6 +127,8 @@ export interface ForTimeScore {
   timeSec?: number; // finished: total time
   reps?: number; // not finished: reps done by the cap
   rounds: number; // full rounds done
+  /** How long each finished round took, in seconds. */
+  roundSec?: number[];
 }
 
 export interface Workout {

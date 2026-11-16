@@ -703,7 +703,7 @@ function AmrapRunner({ block, onFinish, resume, report }: Props) {
           label={t('run.saveScore')}
           size="lg"
           style={{ marginTop: space.lg, alignSelf: 'stretch' }}
-          onPress={() => onFinish(Math.round(workSec), { rounds, reps: extraReps })}
+          onPress={() => onFinish(Math.round(workSec), { rounds, reps: extraReps, ...roundTimes(splits) })}
         />
       </View>
     );
@@ -858,7 +858,9 @@ function ForTimeRunner({ block, onFinish, resume, report }: Props) {
           label={t('run.saveScore')}
           size="lg"
           style={{ marginTop: space.lg, alignSelf: 'stretch' }}
-          onPress={() => onFinish(Math.round(result.timeSec), undefined, { timeSec: Math.round(result.timeSec), rounds: block.rounds })}
+          onPress={() =>
+            onFinish(Math.round(result.timeSec), undefined, { timeSec: Math.round(result.timeSec), rounds: block.rounds, ...roundTimes(multi ? [...splits, result.timeSec] : []) })
+          }
         />
         {back}
       </View>
@@ -887,7 +889,7 @@ function ForTimeRunner({ block, onFinish, resume, report }: Props) {
           label={t('run.saveScore')}
           size="lg"
           style={{ marginTop: space.lg, alignSelf: 'stretch' }}
-          onPress={() => onFinish(Math.round(workSec), undefined, { reps, rounds })}
+          onPress={() => onFinish(Math.round(workSec), undefined, { reps, rounds, ...roundTimes(splits) })}
         />
         {back}
       </View>
@@ -962,4 +964,10 @@ function RoundDots({ total, done }: { total: number; done: number }) {
       })}
     </Row>
   );
+}
+
+/** Each round's time from the clock times when rounds ended (nothing when there are none). */
+function roundTimes(ends: number[]): { roundSec?: number[] } {
+  if (!ends.length) return {};
+  return { roundSec: ends.map((end, i) => Math.round(end - (i ? ends[i - 1] : 0))) };
 }
