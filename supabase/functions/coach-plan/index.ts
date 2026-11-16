@@ -73,6 +73,7 @@ Scale this down for everyone else: same structure and formats, lighter numbers, 
 - advanced: Uzi's week is the reference.
 - Recent logs: if they did every round at the target, go a little higher; if they skipped blocks or did fewer reps, keep or lower. Respect what they actually did over what they answered.
 - coachNotes in the athlete data are the coach's own notes on this athlete, built from their workouts and their chat with the coach: how they train and respond, pain to look after, goals and dates, their schedule and what to follow up on. Use them; they matter as much as the numbers.
+- checkIn in the athlete data is what they answered right before asking for this plan, so it is the newest word on how they are and what they want; it wins over older answers and notes. goal and focus: what this plan is for now (goalChanged = a new goal: build the plan for it, not for the last one; focus = what they want more of, a skill, a competition, a weak point). lastPlan: how the last plan felt: easy = step up from previousPlan, good = keep progressing, hard = hold or lower the load and volume. deload: yes = make the first week a deload (about 40% less volume, same moves, lighter loads) and say so in "progression"; no = no deload; coach = you decide from their logs, how the last plan felt and how long they have trained without one. health: an injury, pain or sickness now: treat it like an injury (leave the area out or unloaded, prehab in the warm-up); after being sick, start lighter and build back up. note: anything else they want the coach to know. Say in the summary how you used their answers.
 - Block feedback in the logs (optional, the athlete fills it in during the rest): feel is easy, good, hard or max (all out); paused means they had to stop the clock; note is their own words. Easy with every round done: go up. Hard, max or paused: keep the load or lower it, add rest, or split the reps. Take the notes seriously (pain, fatigue, technique trouble) and say in the summary when they changed something.
 
 ## Equipment and safety
@@ -342,7 +343,29 @@ type Stored = ReturnType<typeof athleteInput> & {
   change?: { note: string; at: string };
   /** The coach's notes on the athlete (table coach_notes) when the plan was asked for. */
   coachNotes?: string;
+  /** What the athlete answered right before asking for this new plan (when they had one before). */
+  checkIn?: CheckIn;
 };
+
+type CheckIn = { goal: string; goalChanged: boolean; focus: string; lastPlan: string; deload: string; health: string; note: string };
+const GOALS = ['compete', 'endurance', 'strength', 'skills', 'statics', 'fitness'];
+
+/** The athlete's check-in answers, kept to known values and short texts. */
+function cleanCheckIn(v: unknown): CheckIn | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const c = v as Record<string, unknown>;
+  const text = (x: unknown, max: number) => (typeof x === 'string' ? x.replace(/\s+/g, ' ').trim().slice(0, max) : '');
+  const pick = (x: unknown, ok: string[], fallback: string) => (typeof x === 'string' && ok.includes(x) ? x : fallback);
+  return {
+    goal: pick(c.goal, GOALS, ''),
+    goalChanged: c.goalChanged === true,
+    focus: text(c.focus, 400),
+    lastPlan: pick(c.lastPlan, ['easy', 'good', 'hard'], ''),
+    deload: pick(c.deload, ['yes', 'no', 'coach'], 'coach'),
+    health: text(c.health, 400),
+    note: text(c.note, 600),
+  };
+}
 
 /** The part of the stored input Claude reads about the athlete. */
 function aboutAthlete(input: Stored) {
@@ -401,6 +424,7 @@ Deno.serve(async (req) => {
   const language = body.language === 'en' ? 'en' : 'es';
   const exercises = cleanExercises(body.exercises);
   if (exercises.length < 5) return json({ error: 'exercises' }, 400);
+  const checkIn = change === null ? cleanCheckIn(body.checkIn) : undefined;
 
   const profile = user.user_metadata?.profile as Record<string, unknown> | undefined;
   const trainingDays = (Array.isArray(profile?.trainingDays) ? (profile.trainingDays as number[]) : []).filter((d) => Number.isInteger(d) && d >= 0 && d <= 6).sort();
@@ -436,6 +460,7 @@ Deno.serve(async (req) => {
     ...athleteInput(profile, (row?.data ?? {}) as Synced, lastPlan, weeks, today, startDate, language),
     athlete: { name },
     ...(coachNotes ? { coachNotes } : {}),
+    ...(checkIn ? { checkIn } : {}),
     trainingDays,
     exercises,
     ...(change !== null ? { change: { note: change, at: new Date().toISOString() } } : {}),
