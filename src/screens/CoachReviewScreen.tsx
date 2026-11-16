@@ -15,6 +15,7 @@ import {
   saveApprovedEdits,
   sendBack,
   type CoachPlan,
+  type PlanCheckIn,
   type CoachStatus,
   type ReviewItem,
   type ReviewPlan,
@@ -317,6 +318,7 @@ export function CoachPlanScreen({ id }: { id: string }) {
           <Txt style={{ marginTop: 4 }}>{plan.input.change.note}</Txt>
         </Card>
       ) : null}
+      {plan.input.checkIn ? <CheckInCard checkIn={plan.input.checkIn} /> : null}
       {plan.reviewNote ? (
         <Card style={{ marginTop: space.md }}>
           <Txt variant="label" color={colors.muted}>
@@ -449,5 +451,33 @@ export function ReviewHomeCard() {
         <Button label={t('review.open')} size="sm" variant={waiting ? 'primary' : 'secondary'} style={{ marginTop: space.md }} onPress={() => nav.push({ name: 'coachReview' })} />
       </Card>
     </Section>
+  );
+}
+
+// What the athlete answered before asking for this new plan.
+function CheckInCard({ checkIn: c }: { checkIn: PlanCheckIn }) {
+  const t = useT();
+  const rows: [string, string][] = [
+    [t('review.ci.goal'), `${c.goal ? t(`onb.goal.${c.goal}`) : '—'}${c.goalChanged ? ` (${t('review.ci.newGoal')})` : ''}`],
+    ...(c.focus ? ([[t('review.ci.focus'), c.focus]] as [string, string][]) : []),
+    [t('review.ci.lastPlan'), c.lastPlan ? t(`coach.ci.${c.lastPlan}`) : '—'],
+    [t('review.ci.deload'), t(c.deload === 'yes' ? 'coach.ci.yes' : c.deload === 'no' ? 'coach.ci.no' : 'coach.ci.coachDecides')],
+    [t('review.ci.health'), c.health || t('coach.ci.no')],
+    ...(c.note ? ([[t('review.ci.note'), c.note]] as [string, string][]) : []),
+  ];
+  return (
+    <Card style={{ marginTop: space.md, borderColor: colors.accent }}>
+      <Txt variant="label" color={colors.accent}>
+        {t('review.ci.title')}
+      </Txt>
+      {rows.map(([k, v]) => (
+        <Txt key={k} variant="small" style={{ marginTop: 4 }}>
+          <Txt variant="small" color={colors.muted}>
+            {k}:{' '}
+          </Txt>
+          {v}
+        </Txt>
+      ))}
+    </Card>
   );
 }

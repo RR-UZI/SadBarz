@@ -43,8 +43,22 @@ export async function coachStatus(): Promise<CoachPlanStatus | null> {
 
 export type AskResult = { ok: true } | { ok: false; error: AskError; detail: string };
 
-export async function askForPlan(weeks: PlanWeeks, exercises: Exercise[], language: Language): Promise<AskResult> {
-  const body = { weeks, today: isoDay(Date.now()), language, exercises: exercises.map(({ id, name, kind, category }) => ({ id, name, kind, category })) };
+/** What the athlete answers before a new plan, when they already had one: the coach plans from it. */
+export interface PlanCheckIn {
+  /** Their goal for this plan; changed = it isn't the one they had. */
+  goal: Goal;
+  goalChanged: boolean;
+  /** What they want to focus on now, in their words (a skill, a competition, more legs...). */
+  focus: string;
+  lastPlan: 'easy' | 'good' | 'hard';
+  deload: 'yes' | 'no' | 'coach';
+  /** An injury, pain or sickness, in their words; empty when there is none. */
+  health: string;
+  note: string;
+}
+
+export async function askForPlan(weeks: PlanWeeks, exercises: Exercise[], language: Language, checkIn?: PlanCheckIn): Promise<AskResult> {
+  const body = { weeks, today: isoDay(Date.now()), language, exercises: exercises.map(({ id, name, kind, category }) => ({ id, name, kind, category })), ...(checkIn ? { checkIn } : {}) };
   if (!supabase) {
     const status: CoachPlanStatus = { id: 'preview', status: 'review', weeks, startDate: body.today, createdAt: new Date().toISOString() };
     await AsyncStorage.setItem(PREVIEW_KEY, JSON.stringify(status)).catch(() => {});
@@ -96,6 +110,8 @@ export interface PlanInput {
   change?: { note: string; at: string };
   /** The coach's notes on the athlete when the plan was asked for. */
   coachNotes?: string;
+  /** What the athlete answered right before asking for this plan. */
+  checkIn?: PlanCheckIn;
 }
 
 export interface ReviewItem {
