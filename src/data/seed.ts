@@ -299,3 +299,93 @@ const exampleIds = new Set<string>([...Object.values(EXAMPLE_IDS), ...OLD_EXAMPL
 export function isOldExample(r: Routine, monday = exampleMonday()) {
   return !!r.example && r.updatedAt === r.createdAt && r.exampleWeek !== monday && exampleIds.has(r.id);
 }
+
+// English text of the examples (name, notes, block titles), shown when the app is in English. Keyed by the
+// Spanish text, so the saved data keeps Spanish and anything without an entry shows as written.
+const EXAMPLE_EN: Record<string, string> = {
+  // week 1
+  'Bases de pull y push': 'Pull and push basics',
+  'Para construir las primeras dominadas y fondos. Push ups en rodillas si hace falta: lo importante es la técnica.':
+    'To build your first pull ups and dips. Do push ups on your knees if you need to: technique is what matters.',
+  'Australianas + push ups': 'Australian pull ups + push ups',
+  'Sentadillas + chin isométrico': 'Squats + chin up hold',
+  'Push y pull en EMOM': 'Push and pull EMOM',
+  'Cada minuto alterna ejercicio. Si te sobra mucho tiempo, sube 1 o 2 repeticiones.':
+    'Switch exercise every minute. If you have a lot of time left over, add 1 or 2 reps.',
+  'Pull ups + fondos': 'Pull ups + dips',
+  Australianas: 'Australian pull ups',
+  'Lastre push y pull': 'Weighted push and pull',
+  'Cada bloque alterna: ronda con lastre, ronda sin lastre. 2 min de descanso entre bloques.':
+    'Each block alternates: a weighted round, then a bodyweight round. 2 min rest between blocks.',
+  Fondos: 'Dips',
+  // week 2
+  'Full body en circuito': 'Full body circuit',
+  'Tres vueltas a tu ritmo, descansando lo necesario entre ejercicios. Cierra con un tabata.':
+    'Three rounds at your own pace, resting as needed between exercises. Finish with a tabata.',
+  Circuito: 'Circuit',
+  'Descansa lo necesario entre ejercicios.': 'Rest as needed between exercises.',
+  'EM2M: todo dentro de los 2 minutos, lo que sobre es descanso.': 'EM2M: do everything within the 2 minutes, whatever time is left is rest.',
+  'Pull + sentadillas + correr': 'Pull + squats + run',
+  'Fondos + desplantes + burpees': 'Dips + lunges + burpees',
+  'Push + sentadillas explosivas': 'Push + jump squats',
+  'Volumen pull y push': 'Pull and push volume',
+  'Bloque 1: 3 vueltas, cada ejercicio unbroken. Luego EMOM cada 1:15 cambiando de ejercicio. Cierra corriendo 8 min.':
+    'Block 1: 3 rounds, each exercise unbroken. Then an EMOM every 1:15, switching exercise. Finish with an 8 min run.',
+  Calentamiento: 'Warm up',
+  'A tu ritmo, controlando cada repetición.': 'At your own pace, controlling every rep.',
+  'Bloque 1': 'Block 1',
+  'Unbroken cada ejercicio.': 'Each exercise unbroken.',
+  'EMOM cada 1:15': 'EMOM every 1:15',
+  Correr: 'Run',
+  // week 3
+  'Primeras dominadas': 'First pull ups',
+  'Dominadas con liga y negativas para ganar fuerza de jalón. Elige la liga que te deje hacer las 5 con buena técnica.':
+    'Band-assisted pull ups and negatives to build pulling strength. Pick the band that lets you do all 5 with good technique.',
+  'Dominadas con liga': 'Band-assisted pull ups',
+  Negativas: 'Negatives',
+  'negativas, 5 s de bajada': 'negatives, 5 s on the way down',
+  'Chin isométrico + australianas': 'Chin up hold + Australian pull ups',
+  'Fuerza en series': 'Strength sets',
+  'Series con descanso completo: cada repetición limpia, sin balanceo.': 'Sets with full rest: every rep clean, no swinging.',
+  Superserie: 'Superset',
+  'Fuerza con lastre': 'Weighted strength',
+  'Series pesadas: descansa completo entre series y cuida la técnica.': 'Heavy sets: rest fully between sets and keep your technique clean.',
+  'Pull ups con lastre': 'Weighted pull ups',
+  'Fondos con lastre': 'Weighted dips',
+  'Muscle ups con lastre': 'Weighted muscle ups',
+  // week 4
+  'Pierna y core': 'Legs and core',
+  'Pierna sin peso y core. Controla la bajada en cada sentadilla.': 'Bodyweight legs and core. Control the way down on every squat.',
+  'Sentadillas + step ups': 'Squats + step ups',
+  Isometría: 'Isometrics',
+  'con rodillas dobladas': 'with bent knees',
+  'Circuito de volumen': 'Volume circuit',
+  'Cuatro vueltas a ritmo constante. Cierra practicando skills y corriendo 5 min.':
+    'Four rounds at a steady pace. Finish by practicing skills and running for 5 min.',
+  'A tu ritmo, sin parar entre ejercicios si puedes.': 'At your own pace, without stopping between exercises if you can.',
+  'contra la pared': 'against the wall',
+  'Full body con tubos': 'Full body with tubos',
+  'EMOM de 12 min por bloque: minuto 1 tren superior, minuto 2 pierna o cardio. Cada vuelta son 2 minutos.':
+    'A 12 min EMOM per block: minute 1 upper body, minute 2 legs or cardio. Each round is 2 minutes.',
+  'Tubo + fondos · sentadillas': 'Tubo + dips · squats',
+  'Tubo + muscle · desplantes': 'Tubo + muscle · lunges',
+};
+
+/** An example in the app's language. Only an untouched example of this cycle: one the athlete edited keeps their text. */
+export function localRoutine(r: Routine, language: string): Routine {
+  if (language !== 'en' || !r.example || r.updatedAt !== r.createdAt || !exampleIds.has(r.id)) return r;
+  const en = (s: string | undefined) => (s && EXAMPLE_EN[s]) || s;
+  const item = (i: BlockItem): BlockItem => (i.note && EXAMPLE_EN[i.note] ? { ...i, note: EXAMPLE_EN[i.note] } : i);
+  return {
+    ...r,
+    name: en(r.name) ?? r.name,
+    note: en(r.note),
+    blocks: r.blocks.map((b) => ({
+      ...b,
+      title: en(b.title) ?? b.title,
+      note: en(b.note),
+      items: b.items.map(item),
+      rows: b.rows.map((row) => ({ ...row, items: row.items.map(item) })),
+    })),
+  };
+}
