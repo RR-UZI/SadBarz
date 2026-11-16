@@ -54,7 +54,7 @@ Anything else (homework, code, news, politics, money, relationships not about th
 ## How you answer
 - Answer in the language the athlete writes in (Spanish by default, Mexican Spanish, "tú").
 - Short: usually 2 to 6 sentences, or a short list. At most about 150 words unless they ask for detail. No headings. Plain text; short "-" lists are fine.
-- Use what you know about the athlete below: your notes on them, their level, goal, equipment, injuries, recent workouts and the feedback they left on blocks (feel: easy, good, hard, max; paused; their notes), records and plan. Refer to specific workouts and numbers when it helps.
+- Use what you know about the athlete below: your notes on them, their level, goal, equipment, injuries, recent workouts with their times and scores (result: a For time or chipper finish time, or AMRAP rounds, with each round's time) and the feedback they left on blocks (feel: easy, good, hard, max; paused; their notes), records and plan. Refer to specific workouts and numbers when it helps.
 - Give concrete advice: sets, reps, seconds, rest, which progression or regression, a cue to fix technique. Respect their equipment and injuries.
 - If they want to change their plan: talk it through and say what you would change and why. When they have a plan from Uzi and you both agree on the change, call propose_plan_change: the app shows it under your answer, with every change you list in details (before → after, so they know exactly what they are asking for) and a button; they send it, the coach rewrites the plan and Uzi reviews it before it shows in their Mi plan. Only propose what they asked for or agreed to, one proposal per answer, and also say it in your text in a sentence. Small one-off tweaks they can do themselves with ✎ Editar in the routine. With no plan yet, they ask for one from Inicio.
 - Pain or injury: general, conservative advice (stop what hurts, easier variations, rest), and tell them to see a doctor or physiotherapist if it is sharp, keeps coming back or doesn't get better. Never diagnose.
@@ -127,7 +127,18 @@ interface Synced {
     routineName: string;
     totalBlocks?: number;
     note?: string;
-    blocks: { title: string; format: string; status: string; durationSec: number; entries: Entry[]; feel?: string; paused?: boolean; note?: string }[];
+    blocks: {
+      title: string;
+      format: string;
+      status: string;
+      durationSec: number;
+      entries: Entry[];
+      score?: { rounds?: number; reps?: number; roundSec?: number[] };
+      forTime?: { timeSec?: number; reps?: number; rounds?: number; roundSec?: number[] };
+      feel?: string;
+      paused?: boolean;
+      note?: string;
+    }[];
   }[];
   records?: { name: string; unit: string; value: number; reps?: number; date: string }[];
   exercises?: { id: string; name: string }[];
@@ -153,6 +164,18 @@ function entryText(e: Entry, names: Map<string, string>) {
 
 type Workout = NonNullable<Synced['workouts']>[number];
 
+const mmss = (sec: number) => `${Math.floor(sec / 60)}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
+const rounds = (r?: number[]) => (r?.length ? ` (rounds: ${r.map(mmss).join(', ')})` : '');
+
+/** A For time or AMRAP block's score: the finish time (a chipper's time), or what was done by the cap. */
+function resultText(b: Workout['blocks'][number]): string | undefined {
+  const f = b.forTime;
+  if (f) return f.timeSec != null ? `finished in ${mmss(f.timeSec)}${rounds(f.roundSec)}` : `time cap reached: ${f.rounds ?? 0} rounds + ${f.reps ?? 0} reps${rounds(f.roundSec)}`;
+  const s = b.score;
+  if (s) return `${s.rounds ?? 0} rounds + ${s.reps ?? 0} reps${rounds(s.roundSec)}`;
+  return undefined;
+}
+
 // Workouts the way the coach reads them: what was done in each block and how it felt.
 function workoutsFor(list: Workout[], synced: Synced) {
   const names = new Map((synced.exercises ?? []).map((e) => [e.id, e.name]));
@@ -163,7 +186,10 @@ function workoutsFor(list: Workout[], synced: Synced) {
     note: w.note || undefined,
     blocks: w.blocks.map((b) => ({
       title: b.title || b.format,
+      format: b.format,
       status: b.status,
+      time: b.durationSec ? mmss(b.durationSec) : undefined,
+      result: resultText(b),
       done: b.entries.map((e) => entryText(e, names)).join('; ') || undefined,
       feel: b.feel,
       paused: b.paused || undefined,
