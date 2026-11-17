@@ -28,7 +28,11 @@ export const supabase: SupabaseClient | null =
           autoRefreshToken: true,
           persistSession: true,
           // On web the confirmation / password reset links come back to the page with the session in the URL.
-          detectSessionInUrl: Platform.OS === 'web',
+          // Google Health sends the athlete back with its own ?code / ?error (state "health..."): not a sign in.
+          detectSessionInUrl:
+            Platform.OS === 'web'
+              ? (_url, params) => !String(params.state ?? '').startsWith('health.') && Boolean(params.access_token || params.error || params.error_description || params.error_code)
+              : false,
         },
       })
     : null;
