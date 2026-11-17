@@ -186,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const { search, hash, pathname } = window.location;
         const params = new URLSearchParams(`${search.slice(1)}&${hash.slice(1)}`);
-        if (params.get('error') || params.get('error_description')) {
+        if ((params.get('error') || params.get('error_description')) && !(params.get('state') ?? '').startsWith('health.')) {
           setLinkError('linkFailed');
           window.history.replaceState(null, '', pathname);
         }

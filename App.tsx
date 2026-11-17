@@ -1,5 +1,5 @@
 import { StatusBar } from 'expo-status-bar';
-import React from 'react';
+import React, { useEffect } from 'react';
 import { ActivityIndicator, Pressable, Text, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,6 +10,7 @@ import { useT } from './src/i18n';
 import { NavProvider, useNav, type Route, type TabName } from './src/navigation';
 import { AdminUsersScreen } from './src/screens/AdminUsersScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { HealthScreen } from './src/screens/HealthScreen';
 import { HistoryScreen, WorkoutDetailScreen } from './src/screens/HistoryScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { ProfileScreen, RecordEditorScreen } from './src/screens/ProfileScreen';
@@ -26,6 +27,7 @@ import { QuickTimerScreen, StopwatchScreen, TimersScreen } from './src/screens/T
 import { WorkoutScreen } from './src/screens/WorkoutScreen';
 import { AppProvider, useApp } from './src/store/AppStore';
 import { AuthProvider, useAuth } from './src/store/Auth';
+import { googleReturn } from './src/lib/health';
 import { colors } from './src/theme';
 
 export default function App() {
@@ -83,7 +85,12 @@ function SessionLostBanner() {
 function Root() {
   const { ready } = useApp();
   const auth = useAuth();
-  const { stack, tab } = useNav();
+  const { stack, tab, setTab } = useNav();
+  const signedIn = !!auth.user?.profile;
+  // Back from Google Health: the Health tab finishes connecting.
+  useEffect(() => {
+    if (signedIn && googleReturn()) setTab('health');
+  }, [signedIn, setTab]);
 
   if (!ready || !auth.ready) {
     return (
@@ -115,6 +122,7 @@ function Root() {
         {tab === 'home' && <HomeScreen />}
         {tab === 'routines' && <RoutinesScreen />}
         {tab === 'coach' && <CoachScreen />}
+        {tab === 'health' && <HealthScreen />}
         {tab === 'timers' && <TimersScreen />}
         {tab === 'history' && <HistoryScreen />}
       </View>
@@ -164,6 +172,7 @@ const TABS: { name: TabName; icon: string }[] = [
   { name: 'home', icon: '⌂' },
   { name: 'routines', icon: '☰' },
   { name: 'coach', icon: '' },
+  { name: 'health', icon: '' },
   { name: 'timers', icon: '' },
   { name: 'history', icon: '▤' },
 ];
@@ -197,6 +206,8 @@ function TabBar() {
               <TimerIcon color={active ? colors.accent : colors.faint} />
             ) : tb.name === 'coach' ? (
               <ChatIcon color={active ? colors.accent : colors.faint} />
+            ) : tb.name === 'health' ? (
+              <PulseIcon color={active ? colors.accent : colors.faint} />
             ) : (
               <Text style={{ fontSize: 20, lineHeight: 24, color: active ? colors.accent : colors.faint }}>{tb.icon}</Text>
             )}
@@ -204,6 +215,22 @@ function TabBar() {
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+// Drawn heartbeat line for the Health tab.
+function PulseIcon({ color }: { color: string }) {
+  const seg = (left: number, top: number, width: number, deg: number) => (
+    <View style={{ position: 'absolute', left, top, width, height: 2, borderRadius: 1, backgroundColor: color, transform: [{ rotate: `${deg}deg` }] }} />
+  );
+  return (
+    <View style={{ width: 24, height: 24 }}>
+      {seg(0, 13, 7, 0)}
+      {seg(4, 8, 8, -65)}
+      {seg(7, 12, 11, 72)}
+      {seg(11, 10, 9, -62)}
+      {seg(17, 13, 7, 0)}
     </View>
   );
 }
