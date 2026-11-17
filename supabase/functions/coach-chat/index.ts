@@ -59,6 +59,7 @@ Anything else (homework, code, news, politics, money, relationships not about th
 - If they want to change their plan: talk it through and say what you would change and why. When they have a plan from Uzi and you both agree on the change, call propose_plan_change: the app shows it under your answer, with every change you list in details (before → after, so they know exactly what they are asking for) and a button; they send it, the coach rewrites the plan and Uzi reviews it before it shows in their Mi plan. Only propose what they asked for or agreed to, one proposal per answer, and also say it in your text in a sentence. Small one-off tweaks they can do themselves with ✎ Editar in the routine. With no plan yet, they ask for one from Inicio.
 - Pain or injury: general, conservative advice (stop what hurts, easier variations, rest), and tell them to see a doctor or physiotherapist if it is sharp, keeps coming back or doesn't get better. Never diagnose.
 - Mental health: be supportive and practical. If they talk about feeling hopeless, hurting themselves or not wanting to live, put that first: respond with care, encourage them to talk to someone they trust and to a professional, and give a crisis line (in Mexico: Línea de la Vida 800 911 2000; elsewhere: their local emergency number). Don't go back to training in that answer.
+- When their watch is connected you also see their sleep, resting heart rate, HRV, steps and calories. Use it like a coach who cares how they recover: notice short nights, a resting heart rate above their normal or HRV below it, and adjust your advice (lighter session, more rest, sleep first); notice good recovery too. Compare HRV only with their own average. Never diagnose; if something looks off for days, tell them to rest and to see a doctor if it continues.
 - Don't make up data you don't have. If something isn't in what you know about them, ask.
 - Write your answer first; call tools after it.
 
@@ -218,14 +219,80 @@ function athleteBasics(name: string | undefined, profile: Record<string, unknown
 const notesText = (notes: string | undefined) =>
   notes?.trim() ? `Your notes on this athlete (what you have learned about them):\n${notes.trim()}` : "You don't have notes on this athlete yet.";
 
-function athleteContext(name: string | undefined, profile: Record<string, unknown>, synced: Synced, plan: Plan, notes: string | undefined) {
+function athleteContext(name: string | undefined, profile: Record<string, unknown>, synced: Synced, plan: Plan, notes: string | undefined, health?: Health) {
   const since = Date.now() - LOG_DAYS * 24 * 3600 * 1000;
   const workouts = workoutsFor((synced.workouts ?? []).filter((w) => w.startedAt >= since).slice(0, 12), synced);
   return [
     notesText(notes),
     ...athleteBasics(name, profile, synced, plan),
     workouts.length ? `Their workouts in the last ${LOG_DAYS} days (newest first):\n${JSON.stringify(workouts)}` : `No workouts logged in the last ${LOG_DAYS} days.`,
+    health
+      ? `What their watch measured (Google Health; last7 and last28 are averages; days newest first, sleep counts for the day they woke up; sleepMin/deepMin/remMin in minutes, restingHr in bpm, hrvMs = heart rate variability):\n${JSON.stringify(health)}`
+      : 'No watch connected (no sleep or heart data).',
   ].join('\n\n');
+}
+
+// ---------- Their watch (Google Health) ----------
+
+type HealthRow = {
+  day: string;
+  sleep_min: number | null;
+  sleep_deep_min: number | null;
+  sleep_rem_min: number | null;
+  resting_hr: number | null;
+  hrv_ms: number | null;
+  steps: number | null;
+  calories: number | null;
+};
+type Health = {
+  source: string;
+  last7: Record<string, number | null>;
+  last28: Record<string, number | null>;
+  days: Record<string, string | number>[];
+};
+
+/** Sleep, resting heart rate, HRV and activity from their watch: averages and the last 14 days. Undefined with no watch. */
+async function healthFor(userId: string): Promise<Health | undefined> {
+  const since = new Date(Date.now() - 28 * 86_400_000).toISOString().slice(0, 10);
+  const { data, error } = await db
+    .from('health_days')
+    .select('day, sleep_min, sleep_deep_min, sleep_rem_min, resting_hr, hrv_ms, steps, calories')
+    .eq('user_id', userId)
+    .gte('day', since)
+    .order('day', { ascending: false });
+  const rows = (error ? [] : (data ?? [])) as HealthRow[];
+  if (!rows.length) return undefined;
+  const num = (v: unknown) => (v === null || v === undefined || !Number.isFinite(Number(v)) ? null : Number(v));
+  const avg = (list: HealthRow[], k: keyof HealthRow) => {
+    const xs = list.map((r) => num(r[k])).filter((x): x is number => x !== null);
+    return xs.length ? Math.round((xs.reduce((s, x) => s + x, 0) / xs.length) * 10) / 10 : null;
+  };
+  const sum = (list: HealthRow[]) => ({
+    sleepMin: avg(list, 'sleep_min'),
+    deepMin: avg(list, 'sleep_deep_min'),
+    remMin: avg(list, 'sleep_rem_min'),
+    restingHr: avg(list, 'resting_hr'),
+    hrvMs: avg(list, 'hrv_ms'),
+    steps: avg(list, 'steps'),
+    calories: avg(list, 'calories'),
+  });
+  const week = new Date(Date.now() - 7 * 86_400_000).toISOString().slice(0, 10);
+  const days = rows.slice(0, 14).map((r) => {
+    const out: Record<string, string | number> = { date: r.day };
+    const put = (k: string, v: unknown) => {
+      const n = num(v);
+      if (n !== null) out[k] = Math.round(n * 10) / 10;
+    };
+    put('sleepMin', r.sleep_min);
+    put('deepMin', r.sleep_deep_min);
+    put('remMin', r.sleep_rem_min);
+    put('restingHr', r.resting_hr);
+    put('hrvMs', r.hrv_ms);
+    put('steps', r.steps);
+    put('calories', r.calories);
+    return out;
+  });
+  return { source: 'their watch (Fitbit or Pixel Watch, via Google Health)', last7: sum(rows.filter((r) => r.day > week)), last28: sum(rows), days };
 }
 
 // ---------- The request ----------
@@ -279,14 +346,15 @@ Deno.serve(async (req) => {
   }
 
   // What the coach reads: the last messages, and the athlete.
-  const [{ data: past }, { data: row }, plan, { data: notesRow }] = await Promise.all([
+  const [{ data: past }, { data: row }, plan, { data: notesRow }, health] = await Promise.all([
     db.from('coach_messages').select('role, content, proposal').eq('user_id', user.id).order('created_at', { ascending: false }).limit(HISTORY),
     db.from('user_data').select('data').eq('user_id', user.id).maybeSingle(),
     currentPlan(user.id),
     db.from('coach_notes').select('notes').eq('user_id', user.id).maybeSingle(),
+    healthFor(user.id).catch(() => undefined),
   ]);
   const notes = (notesRow as { notes?: string } | null)?.notes ?? '';
-  const context = athleteContext(name, profile, (row?.data ?? {}) as Synced, plan, notes);
+  const context = athleteContext(name, profile, (row?.data ?? {}) as Synced, plan, notes, health);
 
   // Oldest first, starting with the athlete, one turn each (two in a row are joined).
   const turns: { role: 'user' | 'assistant'; content: string }[] = [];
