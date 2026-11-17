@@ -1,14 +1,14 @@
 // The Health tab's numbers: averages, trends, "how you're doing today" and what the numbers say.
 // Pure functions over the merged days, so they are easy to check.
-import { addDays, daysBetween, type MergedDay } from './health';
+import { addDays, daysBetween, type HealthDay } from './health';
 
 export type Metric = 'sleepMin' | 'restingHr' | 'hrvMs' | 'steps' | 'calories';
-export type Days = Map<string, MergedDay>;
+export type Days = Map<string, HealthDay>;
 
 /** "7h 12m" */
 export const hm = (min: number) => `${Math.floor(min / 60)}h ${String(Math.round(min % 60)).padStart(2, '0')}m`;
 
-export function values(days: Days, from: string, to: string, k: keyof MergedDay): number[] {
+export function values(days: Days, from: string, to: string, k: keyof HealthDay): number[] {
   const out: number[] = [];
   for (const d of daysBetween(from, to)) {
     const v = days.get(d)?.[k];
@@ -36,7 +36,7 @@ export function readiness(days: Days, today: string): Readiness {
   const from = addDays(today, -30), to = addDays(today, -1);
   const hrvBase = mean(values(days, from, to, 'hrvMs'));
   const rhrBase = mean(values(days, from, to, 'restingHr'));
-  const enough = (k: keyof MergedDay) => values(days, from, to, k).length >= 5;
+  const enough = (k: keyof HealthDay) => values(days, from, to, k).length >= 5;
   let score = 0, signals = 0;
   const reasons: Note[] = [];
 
@@ -63,17 +63,6 @@ export function readiness(days: Days, today: string): Readiness {
     else if (t.sleepMin >= 450) score += 1;
     reasons.push({ key: t.sleepMin < 420 ? 'health.why.sleepShort' : 'health.why.sleepOk', vars: { v: hm(t.sleepMin) } });
   }
-  if (t?.energy != null) {
-    signals++;
-    if (t.energy <= 2) score -= 1;
-    else if (t.energy >= 4) score += 1;
-    reasons.push({ key: t.energy <= 2 ? 'health.why.energyLow' : t.energy >= 4 ? 'health.why.energyHigh' : 'health.why.energyOk' });
-  }
-  if (t?.soreness != null && t.soreness >= 4) {
-    signals++;
-    score -= 1;
-    reasons.push({ key: 'health.why.sore' });
-  }
   if (!signals) return { level: 'unknown', reasons: [] };
   return { level: score <= -2 ? 'easy' : score >= 1 ? 'ready' : 'normal', reasons };
 }
@@ -82,7 +71,7 @@ export function readiness(days: Days, today: string): Readiness {
 export function insights(days: Days, from: string, to: string, trainingDays: Set<string>): Note[] {
   const out: Note[] = [];
   const range = daysBetween(from, to);
-  const pick = (pred: (d: MergedDay, day: string) => boolean, k: keyof MergedDay) =>
+  const pick = (pred: (d: HealthDay, day: string) => boolean, k: keyof HealthDay) =>
     range.flatMap((day) => {
       const d = days.get(day);
       const v = d?.[k];
@@ -114,13 +103,6 @@ export function insights(days: Days, from: string, to: string, trainingDays: Set
     else if (diff <= -2) out.push({ key: 'health.ins.rhrDown', vars: { d: Math.round(-diff) } });
   }
 
-  // Energy (their log) after good and short nights.
-  const eShort = pick((d) => d.sleepMin != null && d.sleepMin < 420, 'energy');
-  const eLong = pick((d) => d.sleepMin != null && d.sleepMin >= 420, 'energy');
-  if (eShort.length >= 3 && eLong.length >= 3 && mean(eLong)! - mean(eShort)! >= 0.5) {
-    out.push({ key: 'health.ins.energySleep', vars: { a: mean(eLong)!.toFixed(1), b: mean(eShort)!.toFixed(1) } });
-  }
-
   // A steady bedtime helps recovery.
   const beds = range.flatMap((day) => {
     const b = days.get(day)?.bedAt;
@@ -139,10 +121,10 @@ export function insights(days: Days, from: string, to: string, trainingDays: Set
   // Training this period.
   const trained = range.filter((d) => trainingDays.has(d)).length;
   if (trained) {
-    const stepsTrain = pick((_, day) => trainingDays.has(day), 'calories');
-    const stepsRest = pick((_, day) => !trainingDays.has(day), 'calories');
-    if (stepsTrain.length >= 2 && stepsRest.length >= 2) {
-      const diff = mean(stepsTrain)! - mean(stepsRest)!;
+    const calTrain = pick((_, day) => trainingDays.has(day), 'calories');
+    const calRest = pick((_, day) => !trainingDays.has(day), 'calories');
+    if (calTrain.length >= 2 && calRest.length >= 2) {
+      const diff = mean(calTrain)! - mean(calRest)!;
       if (diff >= 100) out.push({ key: 'health.ins.trainCalories', vars: { n: trained, d: Math.round(diff) } });
     }
   }

@@ -1,10 +1,10 @@
-// Health tab: the athlete's sleep, heart and activity from Google Health (Fitbit, Pixel Watch) and their own
-// daily log, with charts, trends, "how you come into today" and what the numbers say about their training.
+// Health tab: the athlete's sleep, heart and activity from Google Health (Fitbit, Pixel Watch), with charts,
+// trends, "how you come into today" and what the numbers say about their training.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 
 import { BarChart, Legend, LineChart, type Point } from '../components/HealthCharts';
-import { Button, Card, Chip, Field, NumberField, Row, Screen, Segmented, Txt } from '../components/ui';
+import { Button, Card, Row, Screen, Segmented, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
 import { confirm } from '../lib/confirm';
 import {
@@ -18,11 +18,9 @@ import {
   healthLink,
   loadHealth,
   localDay,
-  mergeDays,
-  saveLog,
   syncGoogle,
+  type HealthDay,
   type HealthLink,
-  type MergedDay,
 } from '../lib/health';
 import { hm, insights, readiness, summary, type Days, type Metric } from '../lib/healthStats';
 import { useApp } from '../store/AppStore';
@@ -52,8 +50,7 @@ export function HealthScreen() {
   const load = useCallback(async () => {
     if (!userId) return;
     // Enough to compare with the period before and to know their baseline.
-    const rows = await loadHealth(userId, addDays(today, -2 * 90 - 1), today).catch(() => []);
-    setDays(mergeDays(rows));
+    setDays(await loadHealth(userId, addDays(today, -2 * 90 - 1), today).catch(() => new Map<string, HealthDay>()));
   }, [userId, today]);
 
   const sync = useCallback(
@@ -126,11 +123,11 @@ export function HealthScreen() {
     );
   }
 
-  const hasDevice = [...days.values()].some((d) => d.device);
+  const hasData = days.size > 0;
   const ready = readiness(days, today);
   const notes = insights(days, from, today, trainingDays);
   const point = (day: string, total: number | null, segments?: Point['segments']): Point => ({ day, label: label(day), total, segments });
-  const get = (day: string, k: keyof MergedDay) => {
+  const get = (day: string, k: keyof HealthDay) => {
     const v = days.get(day)?.[k];
     return typeof v === 'number' ? v : null;
   };
@@ -174,9 +171,9 @@ export function HealthScreen() {
           </Txt>
         ) : null}
 
-        <LogCard key={today} userId={userId} today={days.get(today)} hasSleep={get(today, 'sleepMin') !== null && !!days.get(today)?.device} onSaved={load} />
-
-        <ReadinessCard r={ready} />
+        {hasData ? <ReadinessCard r={ready} /> : null}
+        {hasData ? (
+          <>
 
         <Segmented value={range} onChange={setRange} options={RANGES.map((r) => ({ value: r, label: t(`health.range.${r}` as StringKey) }))} />
 
@@ -188,8 +185,6 @@ export function HealthScreen() {
           to={today}
           format={(v) => hm(v)}
           better="up"
-          empty={!hasDevice && !list.some((d) => get(d, 'sleepMin') !== null)}
-          emptyText={t('health.emptySleep')}
           longDate={longDate}
           chart={(sel, onSel) => {
             const pts = list.map((d) => {
@@ -232,8 +227,6 @@ export function HealthScreen() {
           }}
         />
 
-        {hasDevice ? (
-          <>
             <MetricCard
               title={t('health.restingHr')}
               metric="restingHr"
@@ -293,8 +286,6 @@ export function HealthScreen() {
               )}
               detail={(day) => (trainingDays.has(day) ? t('health.trainedThatDay') : null)}
             />
-          </>
-        ) : null}
 
         <Card>
           <Txt variant="h2">{t('health.insights')}</Txt>
@@ -318,6 +309,12 @@ export function HealthScreen() {
             {t('health.disclaimer')}
           </Txt>
         </Card>
+          </>
+        ) : link.connected ? (
+          <Txt variant="small" color={colors.muted}>
+            {t('health.noData')}
+          </Txt>
+        ) : null}
       </View>
     </Screen>
   );
@@ -391,101 +388,6 @@ function ConnectCard({
   );
 }
 
-// "How did you wake up?": a few taps a day. Sleep hours only when the watch has none.
-function LogCard({ userId, today, hasSleep, onSaved }: { userId: string; today?: MergedDay; hasSleep: boolean; onSaved: () => void }) {
-  const t = useT();
-  const logged = !!today?.logged;
-  const [open, setOpen] = useState(!logged);
-  const [sleepH, setSleepH] = useState<number | undefined>(today?.sleepMin != null && !hasSleep ? Math.round((today.sleepMin / 60) * 2) / 2 : undefined);
-  const [energy, setEnergy] = useState<number | undefined>(today?.energy ?? undefined);
-  const [soreness, setSoreness] = useState<number | undefined>(today?.soreness ?? undefined);
-  const [note, setNote] = useState(today?.note ?? '');
-  const [saving, setSaving] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  if (!open) {
-    return (
-      <Card onPress={() => setOpen(true)}>
-        <Row style={{ justifyContent: 'space-between' }}>
-          <Txt style={{ fontWeight: '800', flex: 1 }}>{t('health.log.done')}</Txt>
-          <Txt variant="small" color={colors.accent}>
-            {t('health.log.edit')}
-          </Txt>
-        </Row>
-        <Txt variant="small" color={colors.muted} style={{ marginTop: 4 }}>
-          {[
-            today?.energy ? `${t('health.log.energy')}: ${t(`health.log.e${today.energy}` as StringKey)}` : null,
-            today?.soreness ? `${t('health.log.soreness')}: ${t(`health.log.s${today.soreness}` as StringKey)}` : null,
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </Txt>
-      </Card>
-    );
-  }
-
-  const scale = (value: number | undefined, set: (n: number) => void, prefix: 'e' | 's') => (
-    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs, marginTop: space.xs }}>
-      {[1, 2, 3, 4, 5].map((n) => (
-        <Chip key={n} label={t(`health.log.${prefix}${n}` as StringKey)} active={value === n} onPress={() => set(n)} />
-      ))}
-    </View>
-  );
-
-  return (
-    <Card>
-      <Txt variant="h2">{t('health.log.title')}</Txt>
-      <Txt variant="small" color={colors.muted} style={{ marginTop: 4 }}>
-        {t('health.log.body')}
-      </Txt>
-      {!hasSleep ? (
-        <Row style={{ marginTop: space.md, justifyContent: 'space-between' }}>
-          <Txt variant="small" style={{ flex: 1 }}>
-            {t('health.log.sleep')}
-          </Txt>
-          <NumberField value={sleepH} onChange={setSleepH} step={0.5} min={0} max={16} allowEmpty suffix="h" />
-        </Row>
-      ) : null}
-      <Txt variant="small" style={{ marginTop: space.md }}>
-        {t('health.log.energy')}
-      </Txt>
-      {scale(energy, setEnergy, 'e')}
-      <Txt variant="small" style={{ marginTop: space.md }}>
-        {t('health.log.soreness')}
-      </Txt>
-      {scale(soreness, setSoreness, 's')}
-      <View style={{ marginTop: space.md }}>
-        <Field value={note} onChangeText={setNote} placeholder={t('health.log.note')} multiline />
-      </View>
-      {failed ? (
-        <Txt variant="small" color={colors.danger} style={{ marginTop: space.sm }}>
-          {t('health.err.save')}
-        </Txt>
-      ) : null}
-      <Row style={{ marginTop: space.md }}>
-        {logged ? <Button label={t('common.cancel')} variant="ghost" flex onPress={() => setOpen(false)} /> : null}
-        <Button
-          label={saving ? t('health.log.saving') : t('health.log.save')}
-          flex
-          disabled={saving || (!energy && !soreness && sleepH == null && !note.trim())}
-          onPress={async () => {
-            setSaving(true);
-            setFailed(false);
-            try {
-              await saveLog(userId, localDay(), { sleepMin: sleepH != null ? sleepH * 60 : null, energy: energy ?? null, soreness: soreness ?? null, note });
-              setOpen(false);
-              onSaved();
-            } catch {
-              setFailed(true);
-            }
-            setSaving(false);
-          }}
-        />
-      </Row>
-    </Card>
-  );
-}
-
 function ReadinessCard({ r }: { r: ReturnType<typeof readiness> }) {
   const t = useT();
   const color = r.level === 'ready' ? colors.success : r.level === 'easy' ? colors.warn : r.level === 'normal' ? colors.accent : colors.faint;
@@ -528,8 +430,6 @@ function MetricCard({
   chart,
   detail,
   longDate,
-  empty,
-  emptyText,
 }: {
   title: string;
   metric: Metric;
@@ -542,8 +442,6 @@ function MetricCard({
   chart: (selected: number | null, onSelect: (i: number | null) => void) => React.ReactNode;
   detail?: (day: string) => string | null;
   longDate: (day: string) => string;
-  empty?: boolean;
-  emptyText?: string;
 }) {
   const t = useT();
   const [selected, setSelected] = useState<number | null>(null);
@@ -589,15 +487,7 @@ function MetricCard({
         </Txt>
       ) : null}
       <View style={{ marginTop: space.md }}>
-        {empty ? (
-          <View style={{ height: 80, alignItems: 'center', justifyContent: 'center', borderRadius: radius.md, backgroundColor: colors.surface2 }}>
-            <Txt variant="small" color={colors.muted} style={{ textAlign: 'center', paddingHorizontal: space.md }}>
-              {emptyText}
-            </Txt>
-          </View>
-        ) : (
-          chart(selected, setSelected)
-        )}
+        {chart(selected, setSelected)}
       </View>
       {hint ? (
         <Txt variant="tiny" color={colors.faint} style={{ marginTop: space.sm }}>
