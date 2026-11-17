@@ -7,6 +7,10 @@
 //                                                 redirect with ?code=...&state=...
 //   { action: 'finish', code, state, redirect, today } -> { ok, days }   keeps the link and syncs the last 30 days
 //   { action: 'sync', today, days? }           -> { ok, days }   syncs since the last sync (2 days back at least)
+//   { action: 'day', day, start, end }         -> { hours, sleep, now }   one day hour by hour, read live (not saved):
+//      hours = 24 x { start, steps, calories, hrAvg, hrMin, hrMax }; sleep = the night that ended that day with its
+//      stages; now = the latest heart rate (only when end is in the future, i.e. today). start/end = the athlete's
+//      local midnight to midnight, as ISO times.
 //   { action: 'disconnect' }                   -> { ok }   forgets the link and the synced numbers
 //   errors: 401 auth, 400 bad request, 409 'reconnect' (Google took the access back), 500 'failed' / 'config'
 //
@@ -277,6 +281,133 @@ async function sync(userId: string, refresh: string, from: string, to: string): 
   return { days: rows.length, errors };
 }
 
+// ---------- One day, hour by hour ----------
+
+const iso = (v: unknown): string | null => (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v) ? v : null);
+// A start and end time anywhere in a small object ({ startTime, endTime } or { interval: { startTime, endTime } }).
+function timesOf(o: Record<string, unknown>): { start: string | null; end: string | null } {
+  const start = iso(o.startTime) ?? iso(o.start), end = iso(o.endTime) ?? iso(o.end);
+  if (start && end) return { start, end };
+  for (const v of Object.values(o)) {
+    if (v && typeof v === 'object' && !Array.isArray(v)) {
+      const t = timesOf(v as Record<string, unknown>);
+      if (t.start && t.end) return t;
+    }
+  }
+  return { start, end };
+}
+const STAGES = ['AWAKE', 'LIGHT', 'DEEP', 'REM', 'ASLEEP', 'RESTLESS'];
+function stageType(o: Record<string, unknown>): string | null {
+  for (const v of Object.values(o)) {
+    if (typeof v === 'string' && STAGES.includes(v)) return v;
+    if (typeof v === 'string') {
+      const hit = STAGES.find((s) => v.endsWith(`_${s}`) || v === s);
+      if (hit) return hit;
+    }
+  }
+  return null;
+}
+
+async function dayDetail(userId: string, refresh: string, day: string, start: string, end: string) {
+  const { access_token } = await token({ grant_type: 'refresh_token', refresh_token: refresh });
+  const access = String(access_token);
+  const debug: Record<string, unknown> = {};
+  const hours = Array.from({ length: 24 }, (_, i) => ({
+    start: new Date(Date.parse(start) + i * 3600_000).toISOString(),
+    steps: null as number | null,
+    calories: null as number | null,
+    hrAvg: null as number | null,
+    hrMin: null as number | null,
+    hrMax: null as number | null,
+  }));
+  const until = new Date(Math.min(Date.parse(end), Date.now())).toISOString();
+  const slot = (r: Record<string, unknown>) => {
+    const t = Date.parse(String(r.startTime ?? ''));
+    const i = Math.floor((t - Date.parse(start)) / 3600_000);
+    return Number.isFinite(i) && i >= 0 && i < 24 ? hours[i] : null;
+  };
+  const rollUp = async (type: string) =>
+    itemsOf(await call(access, `${type}/dataPoints:rollUp`, { body: { range: { startTime: start, endTime: until }, windowSize: '3600s' } }));
+
+  const parts: [string, () => Promise<unknown>][] = [
+    ['steps', async () => {
+      for (const r of await rollUp('steps')) {
+        const h = slot(r), v = pick(r.steps ?? r, /count/i);
+        if (h && v !== null) h.steps = Math.round(v);
+      }
+    }],
+    ['total-calories', async () => {
+      for (const r of await rollUp('total-calories')) {
+        const h = slot(r), v = pick(r.totalCalories ?? r, /kcal/i);
+        if (h && v !== null) h.calories = Math.round(v);
+      }
+    }],
+    ['heart-rate', async () => {
+      const rows = await rollUp('heart-rate');
+      debug.hourHr = rows[0];
+      for (const r of rows) {
+        const h = slot(r), hr = (r.heartRate ?? r) as Record<string, unknown>;
+        if (!h) continue;
+        h.hrAvg = round1(pick(hr, /avg$/i));
+        h.hrMin = round1(pick(hr, /min$/i));
+        h.hrMax = round1(pick(hr, /max$/i));
+      }
+    }],
+    ['sleep', async () => {
+      const rows = await list(access, 'sleep', `sleep.interval.civil_end_time >= "${day}T00:00:00" AND sleep.interval.civil_end_time < "${addDays(day, 1)}T00:00:00"`);
+      let best: Record<string, unknown> | null = null, bestMin = 0;
+      for (const r of rows) {
+        const s = (r.sleep ?? r) as Record<string, unknown>;
+        const m = num(((s.summary ?? {}) as Record<string, unknown>).minutesAsleep) ?? 0;
+        if (m > bestMin) (best = s), (bestMin = m);
+      }
+      if (!best) return null;
+      const stages = ((best.stages ?? []) as Record<string, unknown>[]).flatMap((st) => {
+        const t = timesOf(st), type = stageType(st);
+        return t.start && t.end && type ? [{ type, start: t.start, end: t.end }] : [];
+      });
+      debug.dayStage = (best.stages as unknown[] | undefined)?.[0];
+      const t = timesOf((best.interval ?? {}) as Record<string, unknown>);
+      return { start: t.start, end: t.end, minutes: bestMin, stages };
+    }],
+  ];
+  const out: Record<string, unknown> = {};
+  const errors: string[] = [];
+  for (const [name, run] of parts) {
+    try {
+      const r = await run();
+      if (name === 'sleep') out.sleep = r;
+    } catch (e) {
+      if (e instanceof Reconnect) throw e;
+      errors.push(`${name}: ${String((e as Error).message ?? e).slice(0, 200)}`);
+    }
+  }
+
+  // Right now: the latest minute with a heart rate in the last 30 minutes (today only).
+  let now: { bpm: number; at: string } | null = null;
+  if (Date.parse(end) > Date.now()) {
+    try {
+      const from = new Date(Date.now() - 30 * 60_000).toISOString();
+      const rows = itemsOf(await call(access, 'heart-rate/dataPoints:rollUp', { body: { range: { startTime: from, endTime: new Date().toISOString() }, windowSize: '60s' } }));
+      for (const r of rows) {
+        const bpm = pick((r.heartRate ?? r) as Record<string, unknown>, /avg/i);
+        const at = iso(r.endTime) ?? iso(r.startTime);
+        if (bpm !== null && at && (!now || at > now.at)) now = { bpm: Math.round(bpm), at };
+      }
+    } catch (e) {
+      if (e instanceof Reconnect) throw e;
+      errors.push(`now: ${String((e as Error).message ?? e).slice(0, 200)}`);
+    }
+  }
+
+  const { data: link } = await db.from('health_links').select('debug').eq('user_id', userId).maybeSingle();
+  await db
+    .from('health_links')
+    .update({ debug: { ...((link?.debug as Record<string, unknown>) ?? {}), ...debug, dayErrors: errors.length ? errors : undefined } })
+    .eq('user_id', userId);
+  return { hours, sleep: out.sleep ?? null, now, errors: errors.length };
+}
+
 // ---------- The request ----------
 
 Deno.serve(async (req) => {
@@ -356,6 +487,16 @@ Deno.serve(async (req) => {
         if (from >= tomorrow) from = today;
         const r = await sync(user.id, link.refresh_token, from, tomorrow);
         return json({ ok: true, days: r.days });
+      }
+
+      case 'day': {
+        if (!configured) return json({ error: 'config' }, 500);
+        if (!link?.refresh_token) return json({ error: 'reconnect' }, 409);
+        const start = iso(body.start), end = iso(body.end);
+        if (!isDay(body.day) || !start || !end || Date.parse(end) - Date.parse(start) > 26 * 3600_000 || Date.parse(end) <= Date.parse(start)) {
+          return json({ error: 'range' }, 400);
+        }
+        return json(await dayDetail(user.id, link.refresh_token, body.day, start, end));
       }
 
       case 'disconnect': {

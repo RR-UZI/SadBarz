@@ -193,3 +193,64 @@ function demoDays(from: string, to: string): HealthDay[] {
     };
   });
 }
+
+// ---------- One day, hour by hour ----------
+
+export interface DayHour {
+  start: string;
+  steps: number | null;
+  calories: number | null;
+  hrAvg: number | null;
+  hrMin: number | null;
+  hrMax: number | null;
+}
+export type StageType = 'AWAKE' | 'LIGHT' | 'DEEP' | 'REM' | 'ASLEEP' | 'RESTLESS';
+export interface DayDetail {
+  hours: DayHour[];
+  sleep: { start: string | null; end: string | null; minutes: number; stages: { type: StageType; start: string; end: string }[] } | null;
+  now: { bpm: number; at: string } | null;
+}
+
+/** A day hour by hour, read live from Google (today or yesterday). */
+export async function loadDay(day: string): Promise<DayDetail> {
+  const [y, m, d] = day.split('-').map(Number);
+  const start = new Date(y, m - 1, d).toISOString();
+  const end = new Date(y, m - 1, d + 1).toISOString();
+  if (!supabase) return demoDay(day, start);
+  const r = await fn({ action: 'day', day, start, end });
+  return { hours: (r.hours as DayHour[]) ?? [], sleep: (r.sleep as DayDetail['sleep']) ?? null, now: (r.now as DayDetail['now']) ?? null };
+}
+
+function demoDay(day: string, start: string): DayDetail {
+  const t0 = Date.parse(start);
+  const isToday = day === localDay();
+  const nowH = isToday ? new Date().getHours() : 24;
+  const r = (k: number) => ((Math.sin((t0 / 3600_000 + k) * 12.9898) * 43758.5453) % 1 + 1) % 1;
+  const hours: DayHour[] = Array.from({ length: 24 }, (_, h) => {
+    if (h > nowH) return { start: new Date(t0 + h * 3600_000).toISOString(), steps: null, calories: null, hrAvg: null, hrMin: null, hrMax: null };
+    const asleep = h < 7;
+    const trained = h === 18;
+    const hr = asleep ? 50 + r(h) * 6 : trained ? 128 + r(h) * 20 : 64 + r(h) * 18;
+    return {
+      start: new Date(t0 + h * 3600_000).toISOString(),
+      steps: asleep ? 0 : Math.round((trained ? 1500 : 200) + r(h + 50) * 900),
+      calories: Math.round(asleep ? 60 : trained ? 420 : 85 + r(h + 90) * 60),
+      hrAvg: Math.round(hr),
+      hrMin: Math.round(hr - 8),
+      hrMax: Math.round(hr + (trained ? 45 : 22)),
+    };
+  });
+  const bed = t0 - 75 * 60_000;
+  const plan: [StageType, number][] = [['LIGHT', 25], ['DEEP', 55], ['LIGHT', 40], ['REM', 25], ['AWAKE', 6], ['LIGHT', 50], ['DEEP', 35], ['REM', 35], ['LIGHT', 60], ['REM', 40], ['AWAKE', 4], ['LIGHT', 45], ['REM', 30]];
+  let t = bed;
+  const stages = plan.map(([type, min]) => {
+    const s = { type, start: new Date(t).toISOString(), end: new Date(t + min * 60_000).toISOString() };
+    t += min * 60_000;
+    return s;
+  });
+  return {
+    hours,
+    sleep: { start: new Date(bed).toISOString(), end: new Date(t).toISOString(), minutes: plan.filter(([s]) => s !== 'AWAKE').reduce((a, [, m]) => a + m, 0), stages },
+    now: isToday ? { bpm: 72, at: new Date(Date.now() - 4 * 60_000).toISOString() } : null,
+  };
+}
