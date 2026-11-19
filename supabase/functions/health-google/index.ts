@@ -421,6 +421,9 @@ Deno.serve(async (req) => {
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const configured = !!(CLIENT_ID && CLIENT_SECRET);
+  // Health is a Pro feature. Free accounts can still see their status and disconnect (e.g. after leaving Pro).
+  const pro = user.app_metadata?.plan === 'pro' || user.app_metadata?.admin === true;
+  if (!pro && body.action !== 'status' && body.action !== 'disconnect') return json({ error: 'pro' }, 403);
   const { data: link } = await db.from('health_links').select('*').eq('user_id', user.id).maybeSingle();
   const today = isDay(body.today) ? body.today : new Date().toISOString().slice(0, 10);
   const tomorrow = addDays(today, 1);

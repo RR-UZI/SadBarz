@@ -23,7 +23,7 @@ export function ProHost() {
   }, []);
 
   const close = () => setReason(null);
-  const perks = [t('pro.perk.routines'), t('pro.perk.coach'), t('pro.perk.history')];
+  const perks = [t('pro.perk.routines'), t('pro.perk.coach'), t('pro.perk.health'), t('pro.perk.history')];
 
   return (
     <Modal visible={reason !== null} transparent animationType="fade" onRequestClose={close}>
