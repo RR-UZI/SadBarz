@@ -14,6 +14,9 @@
 //   (coach-chat). The coach writes a new version of their current plan with that change, same length and start,
 //   for Uzi's review -> 202 { id, status: 'writing' }; 409 { error: 'busy' } while another plan waits for review,
 //   400 { error: 'noplan' } with no approved plan
+// POST { translate: string[], language: 'en' | 'es' }: the plan's text in the app's language, when the athlete reads
+//   the app in another language than the plan was written in -> 200 { map: { [text]: translation } }.
+//   Kept in text_translations, so each text is translated once for everyone.
 //
 // Secrets: ANTHROPIC_API_KEY (added by Uzi in Supabase > Edge Functions > Secrets).
 // SUPABASE_URL and the server key (SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SECRET_KEYS) are provided by Supabase itself.
@@ -491,6 +494,7 @@ Deno.serve(async (req) => {
   if (user.app_metadata?.plan !== 'pro' && !isAdmin) return json({ error: 'pro' }, 403);
 
   const body = await req.json().catch(() => ({}));
+  if (Array.isArray(body.translate)) return json({ map: await translate(body.translate, body.language === 'en' ? 'en' : 'es') });
   if (body.poll === true) return json({ checked: await pollBatches(isAdmin ? null : user.id) });
   if (typeof body.rewrite === 'string') {
     if (!isAdmin) return json({ error: 'admin' }, 403);
@@ -756,4 +760,84 @@ async function pollBatches(userId: string | null): Promise<number> {
     }
   }
   return rows.length;
+}
+
+// ---------- Translating a plan ----------
+// A plan is written in the language the app had when it was asked for. Someone reading the app in the other
+// language gets its text translated here (names, block titles, notes and the exercises the coach created).
+
+const TRANSLATE_MODEL = 'claude-haiku-5-5'; // short gym text: the small model does it well and fast
+const TRANSLATE_MAX = 200; // texts per request
+const TRANSLATE_LEN = 600; // characters per text
+
+const TRANSLATE = `You translate the text of SadBarz, a calisthenics and street workout app, between Spanish and English.
+- You get numbered texts: routine names, block titles, notes and exercise names. Translate each one into the language asked.
+- Keep the street workout terms that have no English name as they are: tubo, tubos, tubo recto, tubo inclinado, chimuela, cuerda.
+- Keep training terms as they are: EMOM, EM2M, E3M, AMRAP, Tabata, for time, unbroken.
+- Use the usual gym names: fondos = dips, dominadas = pull ups, sentadillas = squats, búlgaras = Bulgarian split squats, desplantes = lunges, prensa = leg press, lastre = weighted, superserie = superset, descarga = deload, calentamiento = warm up, pierna = legs, abdomen = abs.
+- Weekday names are translated (Lunes = Monday).
+- Keep numbers, units, times and symbols (" ' · + / x × :) exactly as written. Keep it short and plain, like the original.
+- A text that is already in the language asked comes back unchanged.`;
+
+const TRANSLATED = {
+  type: 'object',
+  properties: {
+    texts: {
+      type: 'array',
+      items: { type: 'object', properties: { n: { type: 'integer' }, text: { type: 'string' } }, required: ['n', 'text'], additionalProperties: false },
+    },
+  },
+  required: ['texts'],
+  additionalProperties: false,
+};
+
+async function translate(asked: unknown[], language: 'en' | 'es'): Promise<Record<string, string>> {
+  const texts = [...new Set(asked.filter((t): t is string => typeof t === 'string').map((t) => t.trim()).filter((t) => t && t.length <= TRANSLATE_LEN))].slice(0, TRANSLATE_MAX);
+  const map: Record<string, string> = {};
+  if (!texts.length) return map;
+
+  // What was translated before. The table may not exist yet: then everything is translated now.
+  for (let i = 0; i < texts.length; i += 40) {
+    const { data } = await db.from('text_translations').select('source, text').eq('language', language).in('source', texts.slice(i, i + 40));
+    for (const r of data ?? []) map[r.source as string] = r.text as string;
+  }
+  const missing = texts.filter((t) => !(t in map));
+  if (!missing.length) return map;
+
+  const claude = new Anthropic(); // reads ANTHROPIC_API_KEY
+  for (let i = 0; i < missing.length; i += 60) {
+    const chunk = missing.slice(i, i + 60);
+    try {
+      const answer = await claude.beta.messages.create({
+        model: TRANSLATE_MODEL,
+        max_tokens: 8000,
+        betas: ['server-side-fallback-2026-07-01'],
+        fallbacks: 'default',
+        output_config: { format: { type: 'json_schema', schema: TRANSLATED } },
+        system: [{ type: 'text', text: TRANSLATE, cache_control: { type: 'ephemeral' } }],
+        messages: [
+          {
+            role: 'user',
+            content: `Translate into ${language === 'en' ? 'English' : 'Spanish'}:\n${chunk.map((t, n) => `${n + 1}. ${JSON.stringify(t)}`).join('\n')}`,
+          },
+        ],
+      });
+      if (answer.stop_reason === 'refusal' || answer.stop_reason === 'max_tokens') continue;
+      const text = answer.content.find((b) => b.type === 'text');
+      if (!text || text.type !== 'text') continue;
+      const out = JSON.parse(text.text) as { texts?: { n: number; text: string }[] };
+      const rows: { language: string; source: string; text: string }[] = [];
+      for (const r of out.texts ?? []) {
+        const source = chunk[r.n - 1];
+        const t = typeof r.text === 'string' ? r.text.trim() : '';
+        if (!source || !t || t.length > TRANSLATE_LEN * 2) continue;
+        map[source] = t;
+        rows.push({ language, source, text: t });
+      }
+      if (rows.length) await db.from('text_translations').upsert(rows, { onConflict: 'language,source' });
+    } catch (e) {
+      console.error('translate', e);
+    }
+  }
+  return map;
 }

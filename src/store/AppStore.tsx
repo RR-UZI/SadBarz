@@ -6,6 +6,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { AppState, Platform } from 'react-native';
 
 import { exampleMonday, isOldExample, localExercise, localRoutine, SEED_EXERCISES, seedRoutines } from '../data/seed';
+import { localCoachExercise, useTranslationsVersion } from '../lib/planText';
 import { useExercisePool } from '../lib/exercisePool';
 import { setVolume } from '../lib/sound';
 import { mergeSynced, pullRemote, pushRemote, syncEnabled, syncedKey, type Synced } from '../lib/sync';
@@ -21,6 +22,8 @@ const DEVICE_SETTINGS_KEY = 'sadbarz:device-settings';
 const PUSH_DELAY_MS = 1500;
 // Bumped when a default changes and saved settings should follow it (2: 10 s lead-in).
 const DATA_VERSION = 5;
+
+const SEED_IDS = new Set(SEED_EXERCISES.map((e) => e.id));
 
 export const DEFAULT_SETTINGS: Settings = {
   language: 'es',
@@ -275,13 +278,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   // The user's exercises (seed + their own), then the approved ones from the shared pool they don't have.
   const pool = useExercisePool();
   const language = data.settings.language;
+  const trVersion = useTranslationsVersion(language);
   const exercises = useMemo(() => {
     const have = new Set(data.exercises.map((e) => e.id));
     const extra = pool.filter((e) => !have.has(e.id));
     const all = extra.length ? [...data.exercises, ...extra] : data.exercises;
-    // Starter exercises in the app's language (only for showing: the saved data keeps its names).
-    return language === 'es' ? all : all.map((e) => localExercise(e, language));
-  }, [data.exercises, pool, language]);
+    // Starter exercises in the app's language (only for showing: the saved data keeps its names), and the ones the
+    // coach created for a plan written in the other language, once translated (lib/planText).
+    return all.map((e) => (SEED_IDS.has(e.id) ? (language === 'es' ? e : localExercise(e, language)) : localCoachExercise(e, language)));
+  }, [data.exercises, pool, language, trVersion]);
   const exerciseById = useCallback((id: string) => exercises.find((e) => e.id === id), [exercises]);
   // The examples in the app's language too (again only for showing).
   const routines = useMemo(() => (language === 'es' ? data.routines : data.routines.map((r) => localRoutine(r, language))), [data.routines, language]);

@@ -8,6 +8,7 @@ import { longDate } from '../components/onboarding';
 import { Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
 import { cachedPlan, myPlan, onPlansChanged, planTiming, type MyPlan } from '../lib/coach';
+import { useLocalPlan } from '../lib/planText';
 import { weekday } from '../lib/profile';
 import { isoDay } from '../lib/records';
 import { startOfWeek } from '../lib/util';
@@ -43,11 +44,12 @@ export function useMyPlan() {
     };
   }, [userId]);
   // Exercises the coach created for the plan exist only in his account: add them here so the routines show their names.
-  const { exercises, addExercise } = useApp();
+  const { exercises, addExercise, settings } = useApp();
   useEffect(() => {
     plan?.exercises?.filter((e) => !exercises.some((x) => x.id === e.id)).forEach(addExercise);
   }, [plan, exercises, addExercise]);
-  return plan;
+  // Shown in the app's language (the coach wrote it in the language the app had when it was asked for).
+  return useLocalPlan(plan, settings.language);
 }
 
 /** A routine of the athlete's real plan, as Home and Rutinas list it. */
@@ -100,9 +102,11 @@ function todayIndex() {
   return weekday(new Date());
 }
 
-// The coach usually names routines "Lunes · ...": add the day only when the name doesn't start with it.
+// The coach usually names routines "Lunes · ...". Shown with the day in the app's language: a weekday at the start
+// of the name, in either language, is replaced, so it never reads "Monday · Lunes · ...".
+const WEEKDAYS = /^(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*[·:\-–—]\s*/i;
 function withDay(name: string, day: string) {
-  return name.toLowerCase().startsWith(day.toLowerCase()) ? name : `${day} · ${name}`;
+  return `${day} · ${name.replace(WEEKDAYS, '')}`;
 }
 
 // The next training day after `from` (wrapping to next week), for rest days.
