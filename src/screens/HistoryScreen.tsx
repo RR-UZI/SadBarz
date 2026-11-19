@@ -3,6 +3,7 @@ import { Modal, ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LogoMark } from '../components/Logo';
+import { BestsCard, WeeklyCard } from '../components/ProgressCards';
 import { Badge, Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT } from '../i18n';
 import { feedbackText } from '../components/BlockFeedback';
@@ -76,6 +77,14 @@ export function HistoryScreen() {
             </Txt>
           </Row>
         </Card>
+      ) : workouts.length ? (
+        <View style={{ gap: space.md, marginBottom: space.lg }}>
+          <WeeklyCard workouts={workouts} />
+          <BestsCard workouts={workouts} />
+          <Txt variant="label" style={{ marginTop: space.sm }}>
+            {t('history.workouts')}
+          </Txt>
+        </View>
       ) : null}
       <View style={{ gap: space.sm, marginTop: isPro ? 0 : space.lg }}>
         {visible.length === 0 ? (
