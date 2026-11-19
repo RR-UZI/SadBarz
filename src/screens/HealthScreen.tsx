@@ -25,6 +25,7 @@ import {
   type HealthLink,
   type StageType,
 } from '../lib/health';
+import { showPro } from '../lib/plan';
 import { hm, insights, mean, readiness, summary, values, type Days, type Metric } from '../lib/healthStats';
 import { useApp } from '../store/AppStore';
 import { useAuth } from '../store/Auth';
@@ -38,7 +39,34 @@ const SYNC_AFTER_MS = 3 * 3600_000; // syncs again when the last one is older th
 
 const STAGE = { deep: '#2F6BFF', rem: '#9B7BFF', light: '#6FC3FF', awake: '#5C5C66' };
 
+// Health is a Pro feature: Free athletes see what it does and the Pro pop-up.
 export function HealthScreen() {
+  const { user } = useAuth();
+  if (!user) return null;
+  // Follows the plan the screens see, so an admin viewing the app as Free sees what Free athletes see.
+  if (user.plan !== 'pro') return <HealthPromo />;
+  return <HealthContent />;
+}
+
+function HealthPromo() {
+  const t = useT();
+  return (
+    <Screen title={t('tab.health')} mark>
+      <Card style={{ borderColor: colors.accent, gap: space.md }}>
+        <Txt variant="h2">{t('health.promoTitle')}</Txt>
+        <Txt color={colors.muted}>{t('health.promoBody')}</Txt>
+        <View style={{ gap: 6 }}>
+          {(['health.promo1', 'health.promo2', 'health.promo3'] as const).map((k) => (
+            <Txt key={k}>✓ {t(k)}</Txt>
+          ))}
+        </View>
+        <Button label={t('pro.cta')} onPress={() => showPro()} />
+      </Card>
+    </Screen>
+  );
+}
+
+function HealthContent() {
   const t = useT();
   const { settings, workouts } = useApp();
   const { user } = useAuth();
