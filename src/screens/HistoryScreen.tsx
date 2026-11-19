@@ -8,14 +8,16 @@ import { useT } from '../i18n';
 import { feedbackText } from '../components/BlockFeedback';
 import { forTimeText, totalReps } from '../lib/blocks';
 import { confirm } from '../lib/confirm';
+import { showPro } from '../lib/plan';
 import { clock, DAY_MS, startOfDay } from '../lib/util';
 import { useNav } from '../navigation';
 import { useApp } from '../store/AppStore';
+import { useAuth } from '../store/Auth';
 import { colors, radius, space } from '../theme';
 import type { Workout } from '../types';
 import { BlockStatusRow, Stat } from './WorkoutScreen';
 
-// Free plan shows the last 2 weeks; Pro will show everything.
+// Free plan shows the last 2 weeks; Pro shows everything.
 const FREE_HISTORY_DAYS = 14;
 
 function useDayLabel() {
@@ -57,21 +59,25 @@ export function WorkoutCard({ workout }: { workout: Workout }) {
 export function HistoryScreen() {
   const t = useT();
   const { workouts } = useApp();
+  const { user } = useAuth();
+  const isPro = user?.plan === 'pro';
   const cutoff = startOfDay(Date.now()) - (FREE_HISTORY_DAYS - 1) * DAY_MS;
-  const visible = workouts.filter((w) => w.startedAt >= cutoff);
+  const visible = isPro ? workouts : workouts.filter((w) => w.startedAt >= cutoff);
 
   return (
     <Screen title={t('history.title')} mark>
-      <Card style={{ borderStyle: 'dashed', borderColor: colors.faint }}>
-        <Txt variant="small">{t('history.free')}</Txt>
-        <Row style={{ marginTop: 6 }}>
-          <Badge label="PRO" color={colors.accent} textColor={colors.accentText} />
-          <Txt variant="small" color={colors.muted} style={{ flex: 1 }}>
-            {t('history.pro')}
-          </Txt>
-        </Row>
-      </Card>
-      <View style={{ gap: space.sm, marginTop: space.lg }}>
+      {!isPro ? (
+        <Card onPress={() => showPro('info')} style={{ borderStyle: 'dashed', borderColor: colors.faint }}>
+          <Txt variant="small">{t('history.free')}</Txt>
+          <Row style={{ marginTop: 6 }}>
+            <Badge label="PRO" color={colors.accent} textColor={colors.accentText} />
+            <Txt variant="small" color={colors.muted} style={{ flex: 1 }}>
+              {t('history.pro')}
+            </Txt>
+          </Row>
+        </Card>
+      ) : null}
+      <View style={{ gap: space.sm, marginTop: isPro ? 0 : space.lg }}>
         {visible.length === 0 ? (
           <View style={{ alignItems: 'center', gap: space.md, paddingVertical: space.xl }}>
             <LogoMark size={64} style={{ opacity: 0.35 }} />
