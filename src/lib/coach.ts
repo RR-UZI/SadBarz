@@ -289,6 +289,8 @@ export interface MyPlan {
   days: { day: number; routine: Routine }[];
   /** Exercises the routines use that may not be in this athlete's app (ones the coach created). */
   exercises?: Exercise[];
+  /** The language the coach wrote it in (the app's language when it was asked for). Older cached plans: Spanish. */
+  language?: Language;
 }
 
 // Kept on the device too, so the plan opens with no signal at the gym.
@@ -304,6 +306,7 @@ function toMyPlan(row: {
   plan: CoachPlan | null;
   approved_plan: CoachPlan | null;
   exercises?: unknown;
+  language?: unknown;
 }): MyPlan | null {
   const plan = row.approved_plan ?? row.plan;
   if (!plan?.days?.length) return null;
@@ -318,6 +321,7 @@ function toMyPlan(row: {
       // A stable id per plan and day, so the workouts done can be matched to the plan's days.
       .map((d) => ({ day: d.day, routine: { ...d.routine, id: `plan_${row.id}_${d.day}` } })),
     exercises: (Array.isArray(row.exercises) ? (row.exercises as Exercise[]) : []).filter((e) => used.has(e.id)),
+    language: row.language === 'en' ? 'en' : 'es',
   };
 }
 
@@ -337,7 +341,7 @@ export async function myPlan(userId: string): Promise<MyPlan | null> {
   if (!supabase) return cachedPlan(userId);
   const { data, error } = await supabase
     .from('coach_plans')
-    .select('id, weeks, start_date, created_at, plan, approved_plan, exercises:input->exercises')
+    .select('id, weeks, start_date, created_at, plan, approved_plan, exercises:input->exercises, language:input->>language')
     // Admins can read every plan, so ask for this user's own.
     .eq('user_id', userId)
     .eq('status', 'approved')
