@@ -15,7 +15,8 @@ permissions:
 
 jobs:
   tests:
-    runs-on: ubuntu-latest
+    # Pinned: the Playwright version in package.json has no browser build for newer Ubuntu releases yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
