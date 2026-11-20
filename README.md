@@ -43,11 +43,20 @@ npx expo start --web     # opens in the browser
 npx expo start           # scan the QR code with Expo Go on your phone
 ```
 
-Checks:
+Checks (GitHub runs all of them on every pull request, see `.github/workflows/ci.yml`):
 
 ```bash
-npx tsc --noEmit
+npm run typecheck        # the app, the tests and the Supabase functions
+npm test                 # unit tests (tests/unit) and function tests (tests/functions)
+npm run build:preview    # then:
+npm run test:e2e         # browser smoke test on the preview build (tests/e2e)
 ```
+
+- **Unit tests** check the app's logic on its own: weekly totals and personal bests, health stats, blocks, plan dates
+  and plan translations.
+- **Function tests** run `coach-plan` and `health-google` as Supabase would, with a fake database, a fake Claude and a
+  fake Google (`tests/fakes`), so they cost nothing and need no keys.
+- **Browser test** signs up a new athlete and opens every tab as Pro and Free, failing on any error in the page.
 
 Shareable web preview (relative paths, can be hosted from any folder):
 

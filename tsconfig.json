@@ -3,6 +3,6 @@
   "compilerOptions": {
     "strict": true
   },
-  // The server functions run on Deno in Supabase and are checked with `deno check`.
-  "exclude": ["node_modules", "supabase/functions"]
+  // The server functions run on Deno in Supabase and are checked with `deno check`; the tests have tests/tsconfig.json.
+  "exclude": ["node_modules", "supabase/functions", "tests", "vitest.config.mts", "playwright.config.ts"]
 }

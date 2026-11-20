@@ -1,0 +1,55 @@
+# Runs on every pull request and on main: type checks, unit and function tests, then the browser smoke test.
+name: Tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    # Pinned: the Playwright version in package.json has no browser build for newer Ubuntu releases yet.
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install
+        run: npm ci
+
+      - name: Type check (app, tests and functions)
+        run: npm run typecheck
+
+      - name: Unit and function tests
+        run: npm test
+
+      - name: Build the web app (preview mode)
+        run: npm run build:preview
+
+      - name: Install the test browser
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser smoke test
+        run: npm run test:e2e
+
+      - name: Keep the browser test report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7

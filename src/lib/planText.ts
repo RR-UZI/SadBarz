@@ -19,7 +19,8 @@ const loading: Partial<Record<Language, Promise<Map_>>> = {};
 const asked = new Set<string>(); // texts already asked for this session, so a failure isn't retried in a loop
 const listeners = new Set<() => void>();
 
-function load(language: Language): Promise<Map_> {
+/** This device's translations into `language`, read once from storage. */
+export function loadTranslations(language: Language): Promise<Map_> {
   if (maps[language]) return Promise.resolve(maps[language]!);
   loading[language] ??= AsyncStorage.getItem(KEY(language))
     .then((saved) => {
@@ -38,6 +39,13 @@ function save(language: Language) {
   const entries = Object.entries(maps[language] ?? {});
   const kept = Object.fromEntries(entries.slice(-KEEP));
   AsyncStorage.setItem(KEY(language), JSON.stringify(kept)).catch(() => {});
+}
+
+// The coach usually names routines "Lunes · ...". Shown with the day in the app's language: a weekday at the start
+// of the name, in either language, is replaced, so it never reads "Monday · Lunes · ...".
+const WEEKDAYS = /^(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*[·:\-–—]\s*/i;
+export function withDay(name: string, day: string) {
+  return `${day} · ${name.replace(WEEKDAYS, '')}`;
 }
 
 /** Every text of a plan the athlete reads. */
@@ -63,7 +71,7 @@ export function planTexts(plan: MyPlan): string[] {
 
 /** Asks the server for the texts this device doesn't have in `language` yet. */
 async function fetchMissing(texts: string[], language: Language) {
-  const map = await load(language);
+  const map = await loadTranslations(language);
   const missing = texts.filter((t) => !(t in map) && !asked.has(`${language}:${t}`));
   if (!missing.length || !supabase) return;
   missing.forEach((t) => asked.add(`${language}:${t}`));
@@ -130,7 +138,7 @@ export function useLocalPlan(plan: MyPlan | null | undefined, language: Language
   }, []);
   useEffect(() => {
     if (!needs || !plan) return;
-    load(language).then(() => {
+    loadTranslations(language).then(() => {
       setVersion((v) => v + 1);
       return fetchMissing(planTexts(plan), language);
     });
@@ -144,7 +152,7 @@ export function useTranslationsVersion(language: Language): number {
   useEffect(() => {
     const bump = () => setVersion((v) => v + 1);
     listeners.add(bump);
-    load(language).then(bump);
+    loadTranslations(language).then(bump);
     return () => {
       listeners.delete(bump);
     };
