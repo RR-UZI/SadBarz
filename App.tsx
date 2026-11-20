@@ -199,7 +199,8 @@ function TabBar() {
             key={tb.name}
             onPress={() => setTab(tb.name)}
             accessibilityRole="tab"
-            accessibilityState={{ selected: active }}
+            accessibilityLabel={t(`tab.${tb.name}`)}
+            aria-selected={active}
             style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}
           >
             {tb.name === 'timers' ? (

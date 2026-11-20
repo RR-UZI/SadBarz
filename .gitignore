@@ -41,3 +41,7 @@ yarn-error.*
 /ios
 /android
 dist-preview/
+
+# test output
+/test-results/
+/playwright-report/

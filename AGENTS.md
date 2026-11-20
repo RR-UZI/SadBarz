@@ -23,6 +23,17 @@ npx expo install --fix      # fix incompatible package versions
 
 Run lint and typecheck before declaring any task done.
 
+Tests (all run on every pull request by `.github/workflows/ci.yml`):
+
+```bash
+npm run typecheck                        # app + tests + supabase/functions
+npm test                                 # Vitest: tests/unit and tests/functions
+npm run build:preview && npm run test:e2e  # Playwright smoke test on the preview build
+```
+
+Add a unit test in `tests/unit` when changing logic in `src/lib`, and a function test in `tests/functions` when
+changing a Supabase function (the fakes for Supabase, Claude and Deno are in `tests/fakes`).
+
 ## Navigation & Routing
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators. Keep non-route code (components, hooks, utils) outside `src/app/`.

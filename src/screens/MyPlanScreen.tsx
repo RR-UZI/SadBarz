@@ -8,7 +8,7 @@ import { longDate } from '../components/onboarding';
 import { Button, Card, Row, Screen, Txt } from '../components/ui';
 import { useT, type StringKey } from '../i18n';
 import { cachedPlan, myPlan, onPlansChanged, planTiming, type MyPlan } from '../lib/coach';
-import { useLocalPlan } from '../lib/planText';
+import { useLocalPlan, withDay } from '../lib/planText';
 import { weekday } from '../lib/profile';
 import { isoDay } from '../lib/records';
 import { startOfWeek } from '../lib/util';
@@ -100,13 +100,6 @@ function useDoneDays(plan: MyPlan | null | undefined): Set<number> {
 
 function todayIndex() {
   return weekday(new Date());
-}
-
-// The coach usually names routines "Lunes · ...". Shown with the day in the app's language: a weekday at the start
-// of the name, in either language, is replaced, so it never reads "Monday · Lunes · ...".
-const WEEKDAYS = /^(lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s*[·:\-–—]\s*/i;
-function withDay(name: string, day: string) {
-  return `${day} · ${name.replace(WEEKDAYS, '')}`;
 }
 
 // The next training day after `from` (wrapping to next week), for rest days.

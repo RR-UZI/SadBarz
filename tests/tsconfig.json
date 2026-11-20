@@ -1,0 +1,21 @@
+{
+  // For the tests: type checks them (npm run typecheck) and tells Vitest how to read TypeScript.
+  // Standalone (the app's config extends expo/tsconfig.base, which Vitest can't resolve).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "jsx": "react-jsx",
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
+    // The functions' Deno imports, read from node_modules (same versions, pinned in package.json).
+    "paths": {
+      "npm:@supabase/supabase-js@*": ["../node_modules/@supabase/supabase-js"],
+      "npm:@anthropic-ai/sdk@*": ["../node_modules/@anthropic-ai/sdk"]
+    }
+  },
+  "include": ["unit/**/*.ts", "stubs/**/*.ts", "fakes/**/*.ts", "functions/**/*.ts", "e2e/**/*.ts", "../supabase/functions/*/index.ts", "../vitest.config.mts", "../playwright.config.ts"]
+}
