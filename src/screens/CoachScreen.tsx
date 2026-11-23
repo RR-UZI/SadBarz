@@ -31,7 +31,8 @@ const SUGGESTIONS = ['coachChat.try1', 'coachChat.try2', 'coachChat.try3', 'coac
 
 export function CoachScreen() {
   const { user } = useAuth();
-  const pro = !!user && (user.plan === 'pro' || user.admin);
+  // user.plan follows the admin's "view as Free" switch, so an admin sees what a Free athlete sees.
+  const pro = user?.plan === 'pro';
   if (!user) return null;
   if (!pro) return <CoachPromo />;
   return <CoachChat userId={user.id} name={user.name} />;
