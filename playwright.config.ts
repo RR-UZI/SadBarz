@@ -15,6 +15,8 @@ export default defineConfig({
     locale: 'en-US',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    // A Chromium already on the machine, when it isn't the one this Playwright version installs.
+    launchOptions: process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
   },
   webServer: {
     command: 'node tests/e2e/serve.mjs',

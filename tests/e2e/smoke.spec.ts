@@ -66,7 +66,11 @@ function watchErrors(page: Page) {
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => {
-    if (m.type() === 'error') errors.push(m.text());
+    // A failed request is reported below with its address, which says more than the console's message.
+    if (m.type() === 'error' && !m.text().startsWith('Failed to load resource')) errors.push(m.text());
+  });
+  page.on('response', (r) => {
+    if (r.status() >= 400) errors.push(`${r.status()} ${r.url()}`);
   });
   return errors;
 }
@@ -110,6 +114,9 @@ test('Pro: every tab opens, with the full history and Health', async ({ page }) 
     await expect(tab(page, name)).toHaveAttribute('aria-selected', 'true');
   }
 
+  await tab(page, 'Coach').click();
+  await expect(page.getByText('Your coach, whenever you need it', { exact: true })).toHaveCount(0);
+
   await tab(page, 'History').click();
   await expect(page.getByText('Progress by week', { exact: true })).toBeVisible();
   await expect(page.getByText('Personal bests', { exact: true })).toBeVisible();
@@ -121,9 +128,12 @@ test('Pro: every tab opens, with the full history and Health', async ({ page }) 
   expect(errors).toEqual([]);
 });
 
-test('Free: History and Health show what Pro adds', async ({ page }) => {
+test('Free: Coach, History and Health show what Pro adds', async ({ page }) => {
   const errors = watchErrors(page);
   await signIn(page, { plan: 'free', language: 'en' });
+
+  await tab(page, 'Coach').click();
+  await expect(page.getByText('Your coach, whenever you need it', { exact: true })).toBeVisible();
 
   await tab(page, 'History').click();
   await expect(page.getByText('With Pro: full history, personal bests and charts.')).toBeVisible();
@@ -133,6 +143,22 @@ test('Free: History and Health show what Pro adds', async ({ page }) => {
   await tab(page, 'Health').click();
   await expect(page.getByText('Your recovery, in numbers', { exact: true })).toBeVisible();
 
+  expect(errors).toEqual([]);
+});
+
+test('an admin viewing the app as Free gets what Free gets', async ({ page }) => {
+  const errors = watchErrors(page);
+  await signIn(page, { plan: 'pro', language: 'en' }); // preview accounts are admins
+  await page.getByRole('button', { name: 'View the app as' }).click();
+
+  for (const [name, promo] of [
+    ['Coach', 'Your coach, whenever you need it'],
+    ['Health', 'Your recovery, in numbers'],
+    ['History', 'With Pro: full history, personal bests and charts.'],
+  ]) {
+    await tab(page, name).click();
+    await expect(page.getByText(promo, { exact: true })).toBeVisible();
+  }
   expect(errors).toEqual([]);
 });
 
