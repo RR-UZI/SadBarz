@@ -47,7 +47,7 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
   const [proposalError, setProposalError] = useState<{ id: string; error: ProposalError } | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
-  const [problem, setProblem] = useState<ChatError | null>(null);
+  const [problem, setProblem] = useState<{ error: ChatError; detail: string } | null>(null);
   const [left, setLeft] = useState<number | null>(null);
   // The coach catching up with workouts it hasn't seen (shown as "looking at your training" after a moment).
   const [catchingUp, setCatchingUp] = useState(false);
@@ -96,7 +96,7 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
       // Not answered: take the message back into the box so it can be sent again.
       setMessages(before);
       setDraft(text);
-      setProblem(res.error);
+      setProblem({ error: res.error, detail: res.detail });
     }
   };
 
@@ -130,9 +130,17 @@ function CoachChat({ userId, name }: { userId: string; name: string }) {
       footer={
         <View style={{ gap: space.sm }}>
           {problem ? (
-            <Txt variant="small" color={problem === 'limit' ? colors.warn : colors.danger}>
-              {t(`coachChat.error.${problem}`)}
-            </Txt>
+            <View>
+              <Txt variant="small" color={problem.error === 'limit' ? colors.warn : colors.danger}>
+                {t(`coachChat.error.${problem.error}`)}
+              </Txt>
+              {/* What the server said (status · code · message), so a broken coach can be traced from a screenshot. */}
+              {problem.detail && problem.error !== 'limit' && problem.error !== 'long' ? (
+                <Txt variant="small" color={colors.muted} numberOfLines={3}>
+                  {problem.detail}
+                </Txt>
+              ) : null}
+            </View>
           ) : left !== null && left <= 5 ? (
             <Txt variant="small" color={colors.muted}>
               {t('coachChat.left', { n: left })}
